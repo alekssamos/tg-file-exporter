@@ -9,6 +9,7 @@ from loguru import logger
 import wx
 import wx.adv
 import asyncio
+import tempfile
 import re
 from wxasync import AsyncBind, WxAsyncApp, StartCoroutine
 import os
@@ -30,6 +31,17 @@ logger.add(
     backtrace=True,
     diagnose=True,
 )
+
+
+def save_path(path=""):
+    _filename = os.path.join(tempfile.gettempdir(), "tg_file_exporter_selected_dir")
+    if path:
+        with open(_filename, "w", encoding="UTF-8") as f:
+            f.write(path)
+    if os.path.isfile(_filename) and os.path.getsize(_filename) > 0:
+        with open(_filename, "r", encoding="UTF-8") as f:
+            return f.read(1024).strip()
+    return ""
 
 
 def WxToPyDate(date: wx._core.DateTime) -> datetime:
@@ -229,9 +241,8 @@ class ExportWizard(wx.Frame):
                 worker.cancel()
         self.Close()
         self.Destroy()
-        await self.client.stop()
         await asyncio.sleep(0.5)
-        sys.exit(0)
+        event.skip()
 
     async def start_export(self):
         self.q = asyncio.queues.Queue(maxsize=MAX_WORKERS)
@@ -595,6 +606,7 @@ class PathSelectionStep(WizardStep):
         self.step_sizer.Add(wx.StaticText(self, label="Путь сохранения:"), 0, wx.ALL, 5)
         self.path_input = wx.TextCtrl(self)
         self.path_input.SetMaxLength(1024)
+        self.path_input.SetValue(save_path())
         self.browse_button = wx.Button(self, label="Обзор")
 
         self.browse_button.Bind(wx.EVT_BUTTON, self.on_browse)
@@ -621,6 +633,7 @@ class PathSelectionStep(WizardStep):
             )
             self.browse_button.SetFocus()
             return False
+        save_path(path)
         return True
 
     def on_browse(self, event):
