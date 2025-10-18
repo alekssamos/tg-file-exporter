@@ -172,6 +172,8 @@ class ExportWizard(wx.Frame):
 
         # загрузить чаты
         if step_index == 3:
+            if self.steps[step_index].update_chats_thread:
+                self.steps[step_index].update_chats_thread.cancel()
             self.steps[step_index].update_chats_thread = StartCoroutine(
                 self.steps[step_index].load_chats(), self
             )
@@ -222,7 +224,7 @@ class ExportWizard(wx.Frame):
     async def on_cancel(self, event):
         if self.export_thread:
             self.export_thread.cancel()
-        if self.workers:
+        if hasattr(self, "workers") and len(self.workers)>0:
             for worker in self.workers:
                 worker.cancel()
         await self.client.stop()
@@ -278,7 +280,7 @@ class ExportWizard(wx.Frame):
             wx.CallAfter(self.steps[-1].update_progress, "Экспорт завершен!")
             wx.CallAfter(
                 wx.MessageBox,
-                "Экспорт завершён!",
+                "Экспорт завершен!",
                 "Информация",
                 wx.OK | wx.ICON_INFORMATION,
             )
@@ -462,28 +464,27 @@ class ChatSelectionStep(WizardStep):
         self.step_sizer.Add(self.chat_list, 1, wx.EXPAND | wx.ALL, 5)
 
     async def load_chats(self):
-        async def _load():
-            try:
-                self.chats = []
-                async for dialog in self.client.get_dialogs():
-                    self.chats.append(dialog)
-                    tm = ""
-                    if dialog.top_message:
-                        tm = dialog.top_message.text or dialog.top_message.caption or ""
-                    wx.CallAfter(
-                        self.chat_list.Append,
-                        f"{_getChatTitle(dialog.chat)} ({tm})",
-                    )
-            except Exception as e:
-                logger.exception("error in update dialogs")
+        try:
+            self.chat_list.Clear()
+            self.chats = []
+            async for dialog in self.client.get_dialogs():
+                self.chats.append(dialog)
+                tm = ""
+                if dialog.top_message:
+                    tm = dialog.top_message.text or dialog.top_message.caption or ""
                 wx.CallAfter(
-                    wx.MessageBox,
-                    f"Ошибка загрузки чатов: {str(e)}",
-                    "Ошибка",
-                    wx.OK | wx.ICON_ERROR,
+                    self.chat_list.Append,
+                    f"{_getChatTitle(dialog.chat)} ({tm})",
                 )
+        except Exception as e:
+            logger.exception("error in update dialogs")
+            wx.CallAfter(
+                wx.MessageBox,
+                f"Ошибка загрузки чатов: {str(e)}",
+                "Ошибка",
+                wx.OK | wx.ICON_ERROR,
+            )
 
-        StartCoroutine(_load(), self)
 
     def update_chat_list(self, chats):
         self.update_chats_thread.cancel()
@@ -546,7 +547,7 @@ class TopicSelectionStep(WizardStep):
         try:
             # Проверить, есть ли темы в чате
             topics = []
-            if self.chat.chat.type == enums.ChatType.SUPERGROUP:
+            if self.chat.chat.is_forum:
                 async for topic in self.client.get_forum_topics(self.chat.chat.id):
                     topics.append(topic)
             self.topics = topics
@@ -565,13 +566,6 @@ class TopicSelectionStep(WizardStep):
                 self.topic_list.SetSelection(0)
                 self.selected_topic = None
                 await p.on_next(None)
-        except errors.exceptions.bad_request_400.ChannelInvalid:
-            self.has_topics = False
-            self.topic_list.Clear()
-            self.topic_list.Append("Чат без тем")
-            self.topic_list.SetSelection(0)
-            self.selected_topic = None
-            await p.on_next()
         except Exception as e:
             logger.exception("error in get topics")
             self.has_topics = False
