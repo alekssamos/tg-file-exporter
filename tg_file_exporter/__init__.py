@@ -54,6 +54,7 @@ class TGFileExporter(WxAsyncApp):
             api_id=self.api_id,
             api_hash=self.api_hash,
             max_concurrent_transmissions=True,
+            no_updates=True,
         )
         self.wizard = ExportWizard(None, title="TG File Exporter", client=self.client)
         self.wizard.Show()
@@ -111,7 +112,7 @@ class ExportWizard(wx.Frame):
         self.steps.append(PhoneStep(self.main_panel, self.client, self.auth_data))
         # Шаг 2: Код
         self.steps.append(CodeStep(self.main_panel, self.client, self.auth_data))
-        # Шаг 3: Пароль (если есть)
+        # Шаг 3: Пароль
         self.steps.append(PasswordStep(self.main_panel, self.client))
         # Шаг 4: Выбор чата
         self.steps.append(ChatSelectionStep(self.main_panel, self.client))
@@ -183,6 +184,8 @@ class ExportWizard(wx.Frame):
         logger.debug(f"back: current_step={self.current_step}")
         if self.current_step > 0 and self.current_step != 3:
             self.current_step -= 1
+            if self.current_step == 4 and not self.steps[self.current_step].has_topics:
+                self.current_step -= 1
             await self.show_step(self.current_step)
 
     async def on_next(self, event):
@@ -215,9 +218,18 @@ class ExportWizard(wx.Frame):
                 self.next_button.Disable()
                 await self.start_export()
 
+    @logger.catch
     async def on_cancel(self, event):
+        if self.export_thread:
+            self.export_thread.cancel()
+        if self.workers:
+            for worker in self.workers:
+                worker.cancel()
         await self.client.stop()
         self.Close()
+        self.Destroy()
+        await asyncio.sleep(0.5)
+        sys.exit(0)
 
     async def start_export(self):
         self.q = asyncio.queues.Queue(maxsize=MAX_WORKERS)
@@ -264,6 +276,12 @@ class ExportWizard(wx.Frame):
 
             await self.q.join()
             wx.CallAfter(self.steps[-1].update_progress, "Экспорт завершен!")
+            wx.CallAfter(
+                wx.MessageBox,
+                "Экспорт завершён!",
+                "Информация",
+                wx.OK | wx.ICON_INFORMATION,
+            )
         except Exception as e:
             logger.exception("error in export")
             wx.CallAfter(self.steps[-1].update_progress, f"Ошибка: {str(e)}")
@@ -386,7 +404,7 @@ class CodeStep(WizardStep):
         return self.code_entered
 
 
-# Шаг 3: Пароль (если есть)
+# Шаг 3: Пароль
 class PasswordStep(WizardStep):
     def __init__(self, parent, client):
         super().__init__(parent)
@@ -395,7 +413,7 @@ class PasswordStep(WizardStep):
         self.password_entered = False
 
         self.step_sizer.Add(
-            wx.StaticText(self, label="Пароль (если требуется):"), 0, wx.ALL, 5
+            wx.StaticText(self, label="Пароль:"), 0, wx.ALL, 5
         )
 
         self.password_input = wx.TextCtrl(
@@ -548,19 +566,20 @@ class TopicSelectionStep(WizardStep):
                 self.topic_list.Append("Чат без тем")
                 self.topic_list.SetSelection(0)
                 self.selected_topic = None
-                await p.show_step(p.current_step + 1)
+                await p.on_next(None)
         except errors.exceptions.bad_request_400.ChannelInvalid:
             self.has_topics = False
             self.topic_list.Clear()
             self.topic_list.Append("Чат без тем")
             self.topic_list.SetSelection(0)
             self.selected_topic = None
-            await p.show_step(p.current_step + 1)
+            await p.on_next()
         except Exception as e:
             logger.exception("error in get topics")
             self.has_topics = False
             wx.MessageBox(
-                f"Ошибка загрузки тем: {str(e)}", "Ошибка", wx.OK | wx.ICON_ERROR
+                f"Ошибка загрузки тем из {_getChatTitle(self.chat.chat)}: {str(e)}",
+                "Ошибка", wx.OK | wx.ICON_ERROR
             )
 
     def on_topic_select(self, event):
@@ -580,6 +599,7 @@ class PathSelectionStep(WizardStep):
         super().__init__(parent)
         self.step_sizer.Add(wx.StaticText(self, label="Путь сохранения:"), 0, wx.ALL, 5)
         self.path_input = wx.TextCtrl(self)
+        self.path_input.SetMaxLength(1024)
         self.browse_button = wx.Button(self, label="Обзор")
 
         self.browse_button.Bind(wx.EVT_BUTTON, self.on_browse)
@@ -591,7 +611,14 @@ class PathSelectionStep(WizardStep):
         self.step_sizer.Add(h_sizer, 0, wx.EXPAND)
 
     def can_proceed(self):
-        if not os.path.isdir(self.path_input.GetValue()):
+        path = self.path_input.GetValue().strip()
+        try:
+            if len(path) > 0:
+                os.makedirs(path, exist_ok=True)
+        except (ValueError, OSError, FileExistsError, RuntimeError):
+            logger.exception("error create export dir")
+            return False
+        if len(path) == 0 or not os.path.isdir(path):
             wx.MessageBox(
                 "Укажите корректный путь к папке для скачивания в неё файлов",
                 "Ошибка",
