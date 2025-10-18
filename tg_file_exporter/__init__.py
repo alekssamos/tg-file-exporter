@@ -412,9 +412,7 @@ class PasswordStep(WizardStep):
         self.client = client
         self.password_entered = False
 
-        self.step_sizer.Add(
-            wx.StaticText(self, label="Пароль:"), 0, wx.ALL, 5
-        )
+        self.step_sizer.Add(wx.StaticText(self, label="Пароль:"), 0, wx.ALL, 5)
 
         self.password_input = wx.TextCtrl(
             self, style=wx.TE_PASSWORD | wx.TE_PROCESS_ENTER
@@ -579,7 +577,8 @@ class TopicSelectionStep(WizardStep):
             self.has_topics = False
             wx.MessageBox(
                 f"Ошибка загрузки тем из {_getChatTitle(self.chat.chat)}: {str(e)}",
-                "Ошибка", wx.OK | wx.ICON_ERROR
+                "Ошибка",
+                wx.OK | wx.ICON_ERROR,
             )
 
     def on_topic_select(self, event):
