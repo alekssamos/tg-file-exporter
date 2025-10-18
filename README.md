@@ -13,6 +13,7 @@
   Windows: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
   
   PyPI: `pip install uv` or `pipx install uv`
+
 2. Установите зависимости: `uv sync`
 3. Получите api_id и api_hash от [Telegram API](https://my.telegram.org/auth)
 4. Замените плейсхолдеры в main.py на реальные значения.
