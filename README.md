@@ -15,8 +15,9 @@
   PyPI: `pip install uv` or `pipx install uv`
 
 2. Установите зависимости: `uv sync`
-3. Получите api_id и api_hash от [Telegram API](https://my.telegram.org/auth)
-4. Замените плейсхолдеры в main.py на реальные значения.
+3. Склонируйте репозиторий: `git clone https://github.com/alekssamos/tg-file-exporter/`
+4. Получите api_id и api_hash от [Telegram API](https://my.telegram.org/auth)
+5. Замените плейсхолдеры в `tg_file_exporter/__init__.py` на реальные значения.
 
 ## Запуск
 
