@@ -453,7 +453,7 @@ class ChatSelectionStep(WizardStep):
                     self.chats.append(dialog)
                     tm = ""
                     if dialog.top_message:
-                        tm = dialog.top_message.text or dialog.top_message.caption
+                        tm = dialog.top_message.text or dialog.top_message.caption or ""
                     wx.CallAfter(
                         self.chat_list.Append,
                         f"{_getChatTitle(dialog.chat)} ({tm})",
@@ -475,7 +475,7 @@ class ChatSelectionStep(WizardStep):
         for chat in chats:
             tm = ""
             if chat.top_message:
-                tm = chat.top_message.text or chat.top_message.caption
+                tm = chat.top_message.text or chat.top_message.caption or ""
             self.chat_list.Append(f"{_getChatTitle(chat.chat)} ({tm})")
 
     async def on_search(self, event):
