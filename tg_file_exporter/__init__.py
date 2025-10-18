@@ -70,7 +70,6 @@ class ExportWizard(wx.Frame):
     def __init__(self, parent, title, client):
         super().__init__(parent, title=title, name="tg_exporter", size=(600, 400))
         self.export_thread = None
-        self.update_chats_thread = None
         self.client = client
         self.auth_data = AuthData(None, None)
         self.main_panel = wx.Panel(self)
@@ -172,7 +171,7 @@ class ExportWizard(wx.Frame):
 
         # загрузить чаты
         if step_index == 3:
-            self.update_chats_thread = StartCoroutine(
+            self.steps[step_index].update_chats_thread = StartCoroutine(
                 self.steps[step_index].load_chats(), self
             )
 
@@ -315,7 +314,7 @@ class PhoneStep(WizardStep):
         self.phone_input = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
         self.phone_input.SetMaxLength(20)
 
-        self.phone_input.Bind(wx.EVT_TEXT_ENTER, self.on_send_code)
+        # self.phone_input.Bind(wx.EVT_TEXT_ENTER, self.on_send_code)
 
         self.step_sizer.Add(self.phone_input, 0, wx.EXPAND | wx.ALL, 5)
 
@@ -429,13 +428,17 @@ class ChatSelectionStep(WizardStep):
         self.client = client
         self.chats = []
         self.selected_chat = None
+        self.update_chats_thread = None
+
 
         self.chat_list = wx.ListBox(self)
         self.search_input = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
+        self.search_input.Disable()
         self.search_button = wx.Button(self, label="Поиск")
+        self.search_button.Disable()
 
-        self.search_input.Bind(wx.EVT_TEXT_ENTER, self.on_search)
-        self.search_button.Bind(wx.EVT_BUTTON, self.on_search)
+        AsyncBind(wx.EVT_TEXT_ENTER, self.on_search, self.search_input)
+        AsyncBind(wx.EVT_BUTTON, self.on_search, self.search_button)
         self.chat_list.Bind(wx.EVT_LISTBOX, self.on_chat_select)
 
         self.step_sizer.Add(wx.StaticText(self, label="Выберите чат:"), 0, wx.ALL, 5)
@@ -449,9 +452,10 @@ class ChatSelectionStep(WizardStep):
                 self.chats = []
                 async for dialog in self.client.get_dialogs():
                     self.chats.append(dialog)
+                    tm = dialog.top_message.text or dialog.top_message.caption
                     wx.CallAfter(
                         self.chat_list.Append,
-                        f"{_getChatTitle(dialog.chat)} ({dialog.chat.id})",
+                        f"{_getChatTitle(dialog.chat)} ({tm})",
                     )
             except Exception as e:
                 logger.exception("error in update dialogs")
@@ -468,15 +472,16 @@ class ChatSelectionStep(WizardStep):
         self.update_chats_thread.cancel()
         self.chat_list.Clear()
         for chat in chats:
-            self.chat_list.Append(f"{_getChatTitle(chat.chat)} ({chat.chat.id})")
+            tm = chat.top_message.text or chat.top_message.caption
+            self.chat_list.Append(f"{_getChatTitle(chat.chat)} ({tm})")
 
     async def on_search(self, event):
         query = (self.search_input.GetValue() or "").strip()
         if query:
             try:
-                # Использовать search_chats для поиска
+                # Использовать search_global для поиска
                 results = []
-                async for result in self.client.search_chats(query):
+                async for result in self.client.search_global(query, limit=30):
                     results.append(results)
                 wx.CallAfter(self.update_chat_list, results)
             except Exception as e:
