@@ -430,7 +430,6 @@ class ChatSelectionStep(WizardStep):
         self.selected_chat = None
         self.update_chats_thread = None
 
-
         self.chat_list = wx.ListBox(self)
         self.search_input = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
         self.search_input.Disable()
