@@ -20,7 +20,9 @@
 
 ## Запуск
 
-`uvw run -m tg_file_exporter`
+Из исходников: `uvw run -m tg_file_exporter`
+
+Или автоматически установить из PyPI последнюю версию и запустить: `uvx tg-file-exporter`
 
 ## Использование
 
