@@ -224,12 +224,12 @@ class ExportWizard(wx.Frame):
     async def on_cancel(self, event):
         if self.export_thread:
             self.export_thread.cancel()
-        if hasattr(self, "workers") and len(self.workers)>0:
+        if hasattr(self, "workers") and len(self.workers) > 0:
             for worker in self.workers:
                 worker.cancel()
-        await self.client.stop()
         self.Close()
         self.Destroy()
+        await self.client.stop()
         await asyncio.sleep(0.5)
         sys.exit(0)
 
@@ -307,7 +307,10 @@ class ExportWizard(wx.Frame):
             ):
                 logger.exception("error in worker")
             finally:
-                self.q.task_done()
+                try:
+                    self.q.task_done()
+                except ValueError:
+                    pass
 
 
 # Базовый класс для шагов
@@ -484,7 +487,6 @@ class ChatSelectionStep(WizardStep):
                 "Ошибка",
                 wx.OK | wx.ICON_ERROR,
             )
-
 
     def update_chat_list(self, chats):
         self.update_chats_thread.cancel()
