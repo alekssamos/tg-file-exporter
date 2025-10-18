@@ -1,0 +1,19 @@
+[project]
+name = "tg-file-exporter"
+version = "1.0.0"
+description = "Download all files from Telegram chat"
+authors = [{ name = "Alexey", email = "aleks-samos@yandex.ru" }]
+readme = "README.md"
+requires-python = ">=3.9.0,<3.12"
+dependencies = [
+    "kurigram>=2.2.12",
+    "loguru>=0.7.3",
+    "tgcrypto>=1.2.5",
+    "wxasync>=0.49",
+    "wxwidgets>=1.0.5",
+]
+[project.gui-scripts]
+tg-file-exporter = "tg_file_exporter.__main__:smain"
+tgf = "tg_file_exporter.__main__:smain"
+tgfe = "tg_file_exporter.__main__:smain"
+
