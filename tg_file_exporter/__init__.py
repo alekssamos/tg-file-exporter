@@ -95,12 +95,13 @@ class ExportWizard(wx.Frame):
 
         # Кнопки навигации
         self.button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.back_button = wx.Button(self.main_panel, label="Назад")
-        self.next_button = wx.Button(self.main_panel, label="Далее")
-        self.cancel_button = wx.Button(self.main_panel, label="Отмена")
+        self.back_button = wx.Button(self.main_panel, label="<&Назад")
+        self.next_button = wx.Button(self.main_panel, label="&Далее>")
+        self.cancel_button = wx.Button(self.main_panel, label="&Отмена")
 
         AsyncBind(wx.EVT_BUTTON, self.on_back, self.back_button)
         AsyncBind(wx.EVT_BUTTON, self.on_next, self.next_button)
+        self.Bind(wx.EVT_CHAR_HOOK, self.on_key_up)
         AsyncBind(wx.EVT_BUTTON, self.on_cancel, self.cancel_button)
 
         self.button_sizer.Add(self.back_button, 0, wx.ALL, 5)
@@ -117,6 +118,14 @@ class ExportWizard(wx.Frame):
         StartCoroutine(self.show_step(0), self)
 
         self.Centre()
+
+    def on_key_up(self, event):
+        key = event.GetKeyCode()
+        event.Skip()
+        if key in [10, 13, 370] and self.current_step < 6:
+            StartCoroutine(self.on_next(event), self)
+        if key == 27 and self.current_step < 6:
+            StartCoroutine(self.on_cancel(event), self)
 
     def init_steps(self):
         logger.debug("adding steps")
@@ -159,7 +168,7 @@ class ExportWizard(wx.Frame):
         # Обновить кнопки
         self.back_button.Enable(step_index > 0)
         self.next_button.SetLabel(
-            "Далее" if step_index < len(self.steps) - 2 else "Экспорт"
+            "&Далее" if step_index < len(self.steps) - 2 else "&Экспорт"
         )
         self.next_button.Enable(True)
         if step_index == 7:
@@ -299,7 +308,8 @@ class ExportWizard(wx.Frame):
             logger.exception("error in export")
             wx.CallAfter(self.steps[-1].update_progress, f"Ошибка: {str(e)}")
         finally:
-            self.cancel_button.SetLabel("Готово")
+            self.cancel_button.SetLabel("&Готово")
+            self.cancel_button.SetFocus()
 
     async def download_media_worker(self):
         while True:
