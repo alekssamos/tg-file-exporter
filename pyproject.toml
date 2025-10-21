@@ -17,3 +17,8 @@ tg-file-exporter = "tg_file_exporter.__main__:smain"
 tgf = "tg_file_exporter.__main__:smain"
 tgfe = "tg_file_exporter.__main__:smain"
 
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.16.0",
+]
+

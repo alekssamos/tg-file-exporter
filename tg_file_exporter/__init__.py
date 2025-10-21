@@ -17,13 +17,14 @@ import sys
 
 MAX_WORKERS = 5
 logger.remove()
-logger.add(
-    sys.stderr,
-    level="DEBUG",
-    format="<green>{time:HH:mm:ss.SSS}</green> <level>{message}</level>   <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan>",
-    backtrace=True,
-    diagnose=True,
-)
+if not getattr(sys, "frozen", False):
+    logger.add(
+        sys.stderr,
+        level="DEBUG",
+        format="<green>{time:HH:mm:ss.SSS}</green> <level>{message}</level>   <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan>",
+        backtrace=True,
+        diagnose=True,
+    )
 logger.add(
     "tg_file_exporter.log",
     level="DEBUG",
@@ -31,6 +32,11 @@ logger.add(
     backtrace=True,
     diagnose=True,
 )
+
+if getattr(sys, "frozen", False):
+    logger.info("program is frozen exe")
+else:
+    logger.info("program is a .py script")
 
 
 def save_path(path=""):
@@ -67,6 +73,7 @@ class TGFileExporter(WxAsyncApp):
             api_hash=self.api_hash,
             max_concurrent_transmissions=True,
             no_updates=True,
+            workdir=os.path.abspath("."),
         )
         self.wizard = ExportWizard(None, title="TG File Exporter", client=self.client)
         self.wizard.Show()
