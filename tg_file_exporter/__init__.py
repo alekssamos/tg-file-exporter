@@ -131,9 +131,9 @@ class ExportWizard(wx.Frame):
     def on_key_up(self, event):
         key = event.GetKeyCode()
         event.Skip()
-        if key in [10, 13, 370] and self.current_step < 6:
+        if key in [10, 13, 370] and self.current_step < 7:
             StartCoroutine(self.on_next(event), self)
-        if key == 27 and self.current_step < 6:
+        if key == 27 and self.current_step < 7:
             StartCoroutine(self.on_cancel(event), self)
 
     @logger.catch
@@ -151,7 +151,7 @@ class ExportWizard(wx.Frame):
         self.steps.append(TopicSelectionStep(self.main_panel, self.client))
         # Шаг 6: Путь сохранения
         self.steps.append(PathSelectionStep(self.main_panel))
-        # Шаг 7: Типы файлов b период
+        # Шаг 7: Типы файлов и период
         self.steps.append(FileTypeSelectionStep(self.main_panel))
         # Шаг 8: Экспорт
         self.steps.append(ExportStep(self.main_panel, self.client))

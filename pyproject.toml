@@ -1,6 +1,6 @@
 [project]
 name = "tg-file-exporter"
-version = "1.1.9"
+version = "1.1.10"
 description = "Download all files from Telegram chat"
 authors = [{ name = "Alexey", email = "aleks-samos@yandex.ru" }]
 readme = "README.md"
