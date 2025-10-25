@@ -475,7 +475,7 @@ class PasswordStep(WizardStep):
         self.password_hint_label.SetCanFocus(True)
         self.step_sizer.Add(self.password_hint_label, 0, wx.EXPAND | wx.ALL, 5)
 
-    async def set_password_hint(self, event):
+    async def set_password_hint(self):
         password_hint = (await self.get_password_hint()) or ""
         self.password_hint_label.SetLabelText("Подсказка: " + password_hint)
 
