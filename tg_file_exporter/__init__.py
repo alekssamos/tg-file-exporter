@@ -16,6 +16,8 @@ import os
 import sys
 
 MAX_WORKERS = 5
+NEXT_BUTTON_LABEL = "&Далее>"
+
 logger.remove()
 if not getattr(sys, "frozen", False):
     logger.add(
@@ -71,7 +73,7 @@ class TGFileExporter(WxAsyncApp):
             "tg_file_exporter",
             api_id=self.api_id,
             api_hash=self.api_hash,
-            max_concurrent_transmissions=True,
+            max_concurrent_transmissions=6,
             no_updates=True,
             workdir=os.path.abspath("."),
         )
@@ -103,7 +105,7 @@ class ExportWizard(wx.Frame):
         # Кнопки навигации
         self.button_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.back_button = wx.Button(self.main_panel, label="<&Назад")
-        self.next_button = wx.Button(self.main_panel, label="&Далее>")
+        self.next_button = wx.Button(self.main_panel, label=NEXT_BUTTON_LABEL)
         self.cancel_button = wx.Button(self.main_panel, label="&Отмена")
 
         AsyncBind(wx.EVT_BUTTON, self.on_back, self.back_button)
@@ -173,9 +175,9 @@ class ExportWizard(wx.Frame):
         self.Layout()
 
         # Обновить кнопки
-        self.back_button.Enable(step_index > 0)
+        self.back_button.Enable(step_index > 0 and step_index != 3)
         self.next_button.SetLabel(
-            "&Далее" if step_index < len(self.steps) - 2 else "&Экспорт"
+            NEXT_BUTTON_LABEL if step_index < len(self.steps) - 2 else "&Экспорт"
         )
         self.next_button.Enable(True)
         if step_index == 7:
@@ -230,6 +232,8 @@ class ExportWizard(wx.Frame):
             # проверить нужен ли пароль?
             if not self.steps[self.current_step].password_needed:
                 self.current_step = 2
+            else:
+                await self.steps[self.current_step].set_password_hint()
         # Проверить пароль
         if self.current_step == 2 and self.steps[1].password_needed:
             await self.steps[self.current_step].on_submit(None)
@@ -287,7 +291,7 @@ class ExportWizard(wx.Frame):
         kwargs = {"chat_id": chat.chat.id, "filter": message_filter}
         try:
             # Использовать search_messages_count для подсчёта
-            total = await self.client.search_messages_count(**kwargs)
+            # total = await self.client.search_messages_count(**kwargs)
             # к сожалению, нельзя указать дату в search_messages_count
             i = 0  # счётчик для прогресса
             # заполняем дату и тему, если указана
@@ -300,7 +304,7 @@ class ExportWizard(wx.Frame):
             # Использовать search_messages для фильтрации
             async for message in self.client.search_messages(**kwargs):
                 await self.q.put((message, path))
-                wx.CallAfter(self.steps[-1].update_progress, f"Скачано {i + 1}/{total}")
+                wx.CallAfter(self.steps[-1].update_progress, f"Скачано {i + 1}")
                 i += 1
 
             await self.q.join()
@@ -324,8 +328,22 @@ class ExportWizard(wx.Frame):
                 message, path = await self.q.get()
                 if not path.endswith(os.path.sep):
                     path = path + os.path.sep
+                # https://docs.kurigram.live/api/types/Message/
+                media = getattr(message, message.media.value)
                 # Скачать медиа
-                await message.download(path)
+                if message.media not in [
+                    enums.MessageMediaType.AUDIO,
+                    enums.MessageMediaType.DOCUMENT,
+                ]:
+                    await message.download(path)
+                else:
+                    file_name = media.file_name
+                    file_name_parts = file_name.split(".")
+                    ext = file_name_parts.pop()
+                    file_name_parts.append(str(message.id))
+                    file_name_parts.append(ext)
+                    file_name = ".".join(file_name_parts)
+                    await message.download(path + file_name)
             except (
                 errors.RPCError,
                 ValueError,
@@ -380,11 +398,11 @@ class PhoneStep(WizardStep):
                 self.auth_data.sent_code = await self.client.send_code(
                     self.auth_data.phone
                 )
-                wx.MessageBox(
-                    "Код отправлен на ваш телефон.",
-                    "Информация",
-                    wx.OK | wx.ICON_INFORMATION,
-                )
+                # wx.MessageBox(
+                # "Код отправлен на ваш телефон.",
+                # "Информация",
+                # wx.OK | wx.ICON_INFORMATION,
+                # )
             except Exception as e:
                 logger.exception("error in sending code")
                 wx.MessageBox(
@@ -453,13 +471,19 @@ class PasswordStep(WizardStep):
         self.password_input.SetMaxLength(100)
 
         self.step_sizer.Add(self.password_input, 0, wx.EXPAND | wx.ALL, 5)
+        self.password_hint_label = wx.StaticText(self, label="Подсказка")
+        self.password_hint_label.SetCanFocus(True)
+        self.step_sizer.Add(self.password_hint_label, 0, wx.EXPAND | wx.ALL, 5)
+
+    async def set_password_hint(self, event):
+        password_hint = (await self.get_password_hint()) or ""
+        self.password_hint_label.SetLabelText("Подсказка: " + password_hint)
 
     async def on_submit(self, event):
         password = self.password_input.GetValue()
         try:
             logger.info("trying password auth")
             await self.client.check_password(password)
-            wx.MessageBox("Пароль принят!", "Успех", wx.OK | wx.ICON_INFORMATION)
             self.password_entered = True
         except Exception as e:
             logger.exception("error password")
@@ -733,7 +757,8 @@ class ExportStep(WizardStep):
     def update_progress(self, message):
         if len(self.progress_text.GetValue()) > 2000000:
             self.progress_text.SetValue("")
-        self.progress_text.AppendText(message + "\n")
+        # self.progress_text.AppendText(message + "\n")
+        self.progress_text.SetValue(message)
 
 
 async def main():
