@@ -53,8 +53,17 @@ def save_path(path=""):
     return ""
 
 
-def WxToPyDate(date: wx._core.DateTime) -> datetime:
-    return datetime(date.GetYear(), date.GetMonth(), date.GetDay())
+def WxToPyDate(date: wx._core.DateTime, is_end: bool=False) -> datetime:
+    hour: int = 0
+    minute: int = 0
+    second: int = 0
+    if is_end:
+        hour = 23
+        minute = 59
+        second = 59
+    return datetime(
+        date.GetYear(), date.GetMonth(), date.GetDay(), hour, minute, second
+    )
 
 
 def _getChatTitle(chat: Chat) -> str:
@@ -277,7 +286,7 @@ class ExportWizard(wx.Frame):
         if hasattr(self, "workers") and len(self.workers) > 0:
             for worker in self.workers:
                 worker.cancel()
-        event.skip()
+        event.Skip()
         self.Close()
         self.Destroy()
         await asyncio.sleep(0.5)
@@ -303,7 +312,7 @@ class ExportWizard(wx.Frame):
         ][1]
         if self.steps[6].checkbox_period.IsChecked():
             min_date = WxToPyDate(self.steps[6].start_date.GetValue())
-            max_date = WxToPyDate(self.steps[6].end_date.GetValue())
+            max_date = WxToPyDate(self.steps[6].end_date.GetValue(), True)
 
         wx.CallAfter(self.steps[-1].update_progress, "Экспорт начат...")
 
@@ -761,7 +770,7 @@ class FileTypeSelectionStep(WizardStep):
 
     def can_proceed(self):
         start_date = WxToPyDate(self.start_date.GetValue())
-        end_date = WxToPyDate(self.end_date.GetValue())
+        end_date = WxToPyDate(self.end_date.GetValue(), True)
         if start_date > end_date and self.checkbox_period.IsChecked():
             wx.MessageBox(
                 "Дата начала не может быть из будущего",
