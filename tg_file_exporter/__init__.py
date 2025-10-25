@@ -107,6 +107,7 @@ class ExportWizard(wx.Frame):
         self.auth_data = AuthData(None, None)
         self.errors_count: int = 0
         self.close_running: bool = False
+        self.completed_export:bool = False
         self.main_panel = wx.Panel(self)
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
         self.main_panel.SetSizer(self.main_sizer)
@@ -120,6 +121,8 @@ class ExportWizard(wx.Frame):
         self.back_button = wx.Button(self.main_panel, label="<&Назад")
         self.next_button = wx.Button(self.main_panel, label=NEXT_BUTTON_LABEL)
         self.cancel_button = wx.Button(self.main_panel, label="&Отмена")
+        self.gh_button = wx.Button(self.main_panel, label="GitHub")
+        self.gh_button.Bind(wx.EVT_BUTTON, self.on_gh)
 
         AsyncBind(wx.EVT_BUTTON, self.on_back, self.back_button)
         AsyncBind(wx.EVT_BUTTON, self.on_next, self.next_button)
@@ -130,6 +133,7 @@ class ExportWizard(wx.Frame):
         self.button_sizer.Add(self.back_button, 0, wx.ALL, 5)
         self.button_sizer.Add(self.next_button, 0, wx.ALL, 5)
         self.button_sizer.Add(self.cancel_button, 0, wx.ALL, 5)
+        self.button_sizer.Add(self.gh_button, 0, wx.ALL, 5)
 
         self.main_sizer.Add(self.button_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 10)
 
@@ -142,6 +146,9 @@ class ExportWizard(wx.Frame):
 
         self.Centre()
 
+    def on_gh(self, event):
+        import webbrowser
+        webbrowser.open("https://github.com/alekssamos/tg-file-exporter/")
     def on_key_up(self, event):
         key = event.GetKeyCode()
         event.Skip()
@@ -278,10 +285,10 @@ class ExportWizard(wx.Frame):
     @logger.catch
     async def on_cancel(self, event):
         if self.close_running:
-            event.Skip()
             return False
         if (
-            wx.MessageBox(
+            not self.completed_export
+            and wx.MessageBox(
                 "Отменить и выйти из программы?",
                 "Закрыть программу?",
                 wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT,
@@ -310,6 +317,9 @@ class ExportWizard(wx.Frame):
 
     @logger.catch
     async def do_export(self):
+        # скрыть не нужужные кнопки
+        self.back_button.Hide()
+        self.next_button.Hide()
         # Собрать параметры
         chat = self.steps[3].selected_chat
         topic = self.steps[4].selected_topic
@@ -349,7 +359,7 @@ class ExportWizard(wx.Frame):
                 i += 1
 
             await self.q.join()
-            self.close_running = True
+            self.completed_export = True
             wx.CallAfter(
                 self.steps[-1].update_progress,
                 f"Экспорт завершен! Скачано {i} файлов, {self.errors_count} ошибок.",
