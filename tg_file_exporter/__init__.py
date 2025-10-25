@@ -4,6 +4,7 @@ from pyrogram import errors
 from pyrogram.types import Chat, Message
 from pyrogram.errors import SessionPasswordNeeded
 from datetime import datetime
+from threading import Lock
 from loguru import logger
 import wx  # type:ignore
 import wx.adv  # type:ignore
@@ -16,6 +17,7 @@ import sys
 
 MAX_WORKERS = 5
 NEXT_BUTTON_LABEL = "&Далее>"
+LOCK = Lock()
 
 logger.remove()
 if not getattr(sys, "frozen", False):
@@ -94,12 +96,13 @@ class ExportWizard(wx.Frame):
         self.export_thread = None
         self.client = client
         self.auth_data = AuthData(None, None)
+        self.errors_count: int = 0
         self.main_panel = wx.Panel(self)
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
         self.main_panel.SetSizer(self.main_sizer)
 
         # Шаги мастера
-        self.steps:list[WizardStep] = []
+        self.steps: list[WizardStep] = []
         self.current_step = 0
 
         # Кнопки навигации
@@ -112,6 +115,7 @@ class ExportWizard(wx.Frame):
         AsyncBind(wx.EVT_BUTTON, self.on_next, self.next_button)
         self.Bind(wx.EVT_CHAR_HOOK, self.on_key_up)
         AsyncBind(wx.EVT_BUTTON, self.on_cancel, self.cancel_button)
+        AsyncBind(wx.EVT_CLOSE, self.on_cancel, self)
 
         self.button_sizer.Add(self.back_button, 0, wx.ALL, 5)
         self.button_sizer.Add(self.next_button, 0, wx.ALL, 5)
@@ -259,19 +263,28 @@ class ExportWizard(wx.Frame):
     @logger.catch
     @logger.catch
     async def on_cancel(self, event):
+        if (
+            wx.MessageBox(
+                "Отменить и выйти из программы?",
+                "Закрыть программу?",
+                wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT,
+            )
+            != wx.YES
+        ):
+            return
         if self.export_thread:
             self.export_thread.cancel()
         if hasattr(self, "workers") and len(self.workers) > 0:
             for worker in self.workers:
                 worker.cancel()
+        event.skip()
         self.Close()
         self.Destroy()
         await asyncio.sleep(0.5)
-        event.skip()
 
     @logger.catch
     async def start_export(self):
-        self.q:asyncio.queues.Queue = asyncio.queues.Queue(maxsize=MAX_WORKERS)
+        self.q: asyncio.queues.Queue = asyncio.queues.Queue(maxsize=MAX_WORKERS)
         self.workers = []
         for _ in range(MAX_WORKERS + 1):
             self.workers.append(StartCoroutine(self.download_media_worker(), self))
@@ -304,10 +317,13 @@ class ExportWizard(wx.Frame):
             # заполняем дату и тему, если указана
             if min_date:
                 kwargs["min_date"] = min_date
+                logger.info(f"min_date={min_date}")
             if max_date:
                 kwargs["max_date"] = max_date
+                logger.info(f"max_date={max_date}")
             if topic:
                 kwargs["message_thread_id"] = topic
+                logger.info(f"topic={topic}")
             # Использовать search_messages для фильтрации
             async for message in self.client.search_messages(**kwargs):
                 await self.q.put((message, path))
@@ -315,10 +331,13 @@ class ExportWizard(wx.Frame):
                 i += 1
 
             await self.q.join()
-            wx.CallAfter(self.steps[-1].update_progress, "Экспорт завершен!")
+            wx.CallAfter(
+                self.steps[-1].update_progress,
+                f"Экспорт завершен! Скачано {i} файлов, {self.errors_count} ошибок.",
+            )
             wx.CallAfter(
                 wx.MessageBox,
-                "Экспорт завершен!",
+                f"Экспорт завершен!  Скачано {i} файлов,  {self.errors_count} ошибок.",
                 "Информация",
                 wx.OK | wx.ICON_INFORMATION,
             )
@@ -351,7 +370,10 @@ class ExportWizard(wx.Frame):
                     file_name_parts.append(str(message.id))
                     file_name_parts.append(ext)
                     file_name = ".".join(file_name_parts)
-                    await message.download(path + file_name)
+                    if not os.path.isfile(path + file_name):
+                        await message.download(path + file_name)
+                    else:
+                        logger.info(f"file {file_name} already exists, skiping...")
             except (
                 errors.RPCError,
                 ValueError,
@@ -360,6 +382,8 @@ class ExportWizard(wx.Frame):
                 FileExistsError,
             ):
                 logger.exception("error in worker")
+                with LOCK:
+                    self.errors_count += 1
             finally:
                 try:
                     self.q.task_done()
@@ -568,7 +592,7 @@ class ChatSelectionStep(WizardStep):
         if query:
             try:
                 # Использовать search_global для поиска
-                results:list[Message] = []
+                results: list[Message] = []
                 async for result in self.client.search_global(query, limit=30):
                     results.append(result)
                 wx.CallAfter(self.update_chat_list, results)
