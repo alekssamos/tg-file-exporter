@@ -233,7 +233,7 @@ class ExportWizard(wx.Frame):
             if not self.steps[self.current_step].password_needed:
                 self.current_step = 2
             else:
-                await self.steps[self.current_step].set_password_hint()
+                await self.steps[2].set_password_hint()
         # Проверить пароль
         if self.current_step == 2 and self.steps[1].password_needed:
             await self.steps[self.current_step].on_submit(None)
