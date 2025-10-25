@@ -1,17 +1,16 @@
-# type:ignore
 from pyrogram import Client
 from pyrogram import enums
 from pyrogram import errors
-from pyrogram.types import Chat
+from pyrogram.types import Chat, Message
 from pyrogram.errors import SessionPasswordNeeded
 from datetime import datetime
 from loguru import logger
-import wx
-import wx.adv
+import wx  # type:ignore
+import wx.adv  # type:ignore
 import asyncio
 import tempfile
 import re
-from wxasync import AsyncBind, WxAsyncApp, StartCoroutine
+from wxasync import AsyncBind, WxAsyncApp, StartCoroutine  # type:ignore
 import os
 import sys
 
@@ -65,6 +64,7 @@ class TGFileExporter(WxAsyncApp):
     def __init__(self):
         super().__init__(sleep_duration=0.000001)
 
+    @logger.catch
     def OnInit(self):
         # Параметры для Kurigram
         self.api_id = 2040
@@ -99,7 +99,7 @@ class ExportWizard(wx.Frame):
         self.main_panel.SetSizer(self.main_sizer)
 
         # Шаги мастера
-        self.steps = []
+        self.steps:list[WizardStep] = []
         self.current_step = 0
 
         # Кнопки навигации
@@ -136,6 +136,7 @@ class ExportWizard(wx.Frame):
         if key == 27 and self.current_step < 6:
             StartCoroutine(self.on_cancel(event), self)
 
+    @logger.catch
     def init_steps(self):
         logger.debug("adding steps")
         # Шаг 1: Номер телефона
@@ -155,6 +156,7 @@ class ExportWizard(wx.Frame):
         # Шаг 8: Экспорт
         self.steps.append(ExportStep(self.main_panel, self.client))
 
+    @logger.catch
     async def show_step(self, step_index):
         # Пропустить шаги авторизации если авторизован
         if step_index == 0:
@@ -212,6 +214,7 @@ class ExportWizard(wx.Frame):
         if step_index == 4:
             StartCoroutine(self.steps[step_index].load_topics(self), self)
 
+    @logger.catch
     async def on_back(self, event):
         logger.debug(f"back: current_step={self.current_step}")
         if self.current_step > 0 and self.current_step != 3:
@@ -220,6 +223,7 @@ class ExportWizard(wx.Frame):
                 self.current_step -= 1
             await self.show_step(self.current_step)
 
+    @logger.catch
     async def on_next(self, event):
         logger.debug(f"next: current_step={self.current_step}")
         ############### events ###<
@@ -253,6 +257,7 @@ class ExportWizard(wx.Frame):
                 await self.start_export()
 
     @logger.catch
+    @logger.catch
     async def on_cancel(self, event):
         if self.export_thread:
             self.export_thread.cancel()
@@ -264,13 +269,15 @@ class ExportWizard(wx.Frame):
         await asyncio.sleep(0.5)
         event.skip()
 
+    @logger.catch
     async def start_export(self):
-        self.q = asyncio.queues.Queue(maxsize=MAX_WORKERS)
+        self.q:asyncio.queues.Queue = asyncio.queues.Queue(maxsize=MAX_WORKERS)
         self.workers = []
         for _ in range(MAX_WORKERS + 1):
             self.workers.append(StartCoroutine(self.download_media_worker(), self))
         self.export_thread = StartCoroutine(self.do_export(), self)
 
+    @logger.catch
     async def do_export(self):
         # Собрать параметры
         chat = self.steps[3].selected_chat
@@ -322,6 +329,7 @@ class ExportWizard(wx.Frame):
             self.cancel_button.SetLabel("&Готово")
             self.cancel_button.SetFocus()
 
+    @logger.catch
     async def download_media_worker(self):
         while True:
             try:
@@ -387,6 +395,7 @@ class PhoneStep(WizardStep):
 
         self.step_sizer.Add(self.phone_input, 0, wx.EXPAND | wx.ALL, 5)
 
+    @logger.catch
     async def on_send_code(self, event):
         logger.info("Going to send the code...")
         phone = re.sub(r"\D+", "", (self.phone_input.GetValue() or ""))
@@ -430,6 +439,7 @@ class CodeStep(WizardStep):
 
         self.step_sizer.Add(self.code_input, 0, wx.EXPAND | wx.ALL, 5)
 
+    @logger.catch
     async def on_sign_in(self, event):
         code = self.code_input.GetValue() or ""
         if code:
@@ -475,10 +485,12 @@ class PasswordStep(WizardStep):
         self.password_hint_label.SetCanFocus(True)
         self.step_sizer.Add(self.password_hint_label, 0, wx.EXPAND | wx.ALL, 5)
 
+    @logger.catch
     async def set_password_hint(self):
-        password_hint = (await self.get_password_hint()) or ""
+        password_hint = (await self.client.get_password_hint()) or ""
         self.password_hint_label.SetLabelText("Подсказка: " + password_hint)
 
+    @logger.catch
     async def on_submit(self, event):
         password = self.password_input.GetValue()
         try:
@@ -518,6 +530,7 @@ class ChatSelectionStep(WizardStep):
         self.step_sizer.Add(self.search_button, 0, wx.ALL, 5)
         self.step_sizer.Add(self.chat_list, 1, wx.EXPAND | wx.ALL, 5)
 
+    @logger.catch
     async def load_chats(self):
         try:
             self.chat_list.Clear()
@@ -541,7 +554,7 @@ class ChatSelectionStep(WizardStep):
             )
 
     def update_chat_list(self, chats):
-        self.update_chats_thread.cancel()
+        self.update_chats_thread.cancel()  # type:ignore
         self.chat_list.Clear()
         for chat in chats:
             tm = ""
@@ -549,14 +562,15 @@ class ChatSelectionStep(WizardStep):
                 tm = chat.top_message.text or chat.top_message.caption or ""
             self.chat_list.Append(f"{_getChatTitle(chat.chat)} ({tm})")
 
+    @logger.catch
     async def on_search(self, event):
         query = (self.search_input.GetValue() or "").strip()
         if query:
             try:
                 # Использовать search_global для поиска
-                results = []
+                results:list[Message] = []
                 async for result in self.client.search_global(query, limit=30):
-                    results.append(results)
+                    results.append(result)
                 wx.CallAfter(self.update_chat_list, results)
             except Exception as e:
                 logger.exception("error in search")
@@ -594,9 +608,11 @@ class TopicSelectionStep(WizardStep):
         )
         self.step_sizer.Add(self.topic_list, 1, wx.EXPAND | wx.ALL, 5)
 
+    @logger.catch
     async def set_chat(self, chat):
         self.chat = chat
 
+    @logger.catch
     async def load_topics(self, p):
         try:
             # Проверить, есть ли темы в чате
@@ -629,6 +645,7 @@ class TopicSelectionStep(WizardStep):
                 wx.OK | wx.ICON_ERROR,
             )
 
+    @logger.catch
     def on_topic_select(self, event):
         index = self.topic_list.GetSelection()
         if index == 0:
