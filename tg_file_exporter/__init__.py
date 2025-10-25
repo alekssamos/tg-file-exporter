@@ -241,6 +241,7 @@ class ExportWizard(wx.Frame):
     async def on_next(self, event):
         logger.debug(f"next: current_step={self.current_step}")
         ############### events ###<
+        autoskip:bool = False
         # отправить код
         if self.current_step == 0:
             await self.steps[self.current_step].on_send_code(None)
@@ -249,7 +250,8 @@ class ExportWizard(wx.Frame):
             await self.steps[self.current_step].on_sign_in(None)
             # проверить нужен ли пароль?
             if not self.steps[self.current_step].password_needed:
-                self.current_step = 2
+                self.current_step = 3
+                autoskip=True
             else:
                 await self.steps[2].set_password_hint()
         # Проверить пароль
@@ -258,7 +260,9 @@ class ExportWizard(wx.Frame):
         ############### events ###>
         if self.current_step < len(self.steps) - 1:
             # Проверить, можно ли перейти дальше
-            if self.steps[self.current_step].can_proceed():
+            if autoskip:
+                await self.show_step(self.current_step)
+            if not autoskip and self.steps[self.current_step].can_proceed():
                 self.current_step += 1
                 # Если переходим к выбору темы, передать чат
                 if self.current_step == 4 and hasattr(self.steps[3], "selected_chat"):
@@ -487,13 +491,12 @@ class CodeStep(WizardStep):
                 await self.client.sign_in(
                     self.auth_data.phone, self.auth_data.sent_code.phone_code_hash, code
                 )
-                wx.MessageBox(
-                    "Вход выполнен успешно!", "Успех", wx.OK | wx.ICON_INFORMATION
-                )
                 self.code_entered = True
+                logger.info("authorized successfully")
             except SessionPasswordNeeded:
                 self.code_entered = True
                 self.password_needed = True
+                logger.info("needed password")
             except Exception as e:
                 logger.exception("error sign in")
                 wx.MessageBox(
