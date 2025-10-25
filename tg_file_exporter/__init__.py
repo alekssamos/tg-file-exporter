@@ -107,6 +107,7 @@ class ExportWizard(wx.Frame):
         self.auth_data = AuthData(None, None)
         self.errors_count: int = 0
         self.close_running: bool = False
+        self.export_completed: bool = False
         self.main_panel = wx.Panel(self)
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
         self.main_panel.SetSizer(self.main_sizer)
@@ -267,7 +268,8 @@ class ExportWizard(wx.Frame):
         else:
             # Начать экспорт
             if not hasattr(self, "workers"):
-                self.next_button.Disable()
+                self.next_button.Hide()
+                self.back_button.Hide()
                 await self.start_export()
 
     @logger.catch
@@ -277,7 +279,8 @@ class ExportWizard(wx.Frame):
             event.Skip()
             return False
         if (
-            wx.MessageBox(
+            not self.export_completed
+            and wx.MessageBox(
                 "Отменить и выйти из программы?",
                 "Закрыть программу?",
                 wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT,
@@ -345,7 +348,7 @@ class ExportWizard(wx.Frame):
                 i += 1
 
             await self.q.join()
-            self.close_running = True
+            self.export_completed = True
             wx.CallAfter(
                 self.steps[-1].update_progress,
                 f"Экспорт завершен! Скачано {i} файлов, {self.errors_count} ошибок.",
