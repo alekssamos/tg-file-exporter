@@ -53,7 +53,7 @@ def save_path(path=""):
     return ""
 
 
-def WxToPyDate(date: wx._core.DateTime, is_end: bool=False) -> datetime:
+def WxToPyDate(date: wx._core.DateTime, is_end: bool = False) -> datetime:
     hour: int = 0
     minute: int = 0
     second: int = 0
@@ -106,6 +106,7 @@ class ExportWizard(wx.Frame):
         self.client = client
         self.auth_data = AuthData(None, None)
         self.errors_count: int = 0
+        self.close_running: bool = False
         self.main_panel = wx.Panel(self)
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
         self.main_panel.SetSizer(self.main_sizer)
@@ -272,6 +273,9 @@ class ExportWizard(wx.Frame):
     @logger.catch
     @logger.catch
     async def on_cancel(self, event):
+        if self.close_running:
+            event.Skip()
+            return False
         if (
             wx.MessageBox(
                 "Отменить и выйти из программы?",
@@ -281,6 +285,7 @@ class ExportWizard(wx.Frame):
             != wx.YES
         ):
             return
+        self.close_running = True
         if self.export_thread:
             self.export_thread.cancel()
         if hasattr(self, "workers") and len(self.workers) > 0:
@@ -340,6 +345,7 @@ class ExportWizard(wx.Frame):
                 i += 1
 
             await self.q.join()
+            self.close_running = True
             wx.CallAfter(
                 self.steps[-1].update_progress,
                 f"Экспорт завершен! Скачано {i} файлов, {self.errors_count} ошибок.",
