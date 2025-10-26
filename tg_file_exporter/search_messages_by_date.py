@@ -1,3 +1,4 @@
+# type:ignore
 from datetime import datetime
 from pyrogram.types import Message
 from pyrogram import Client, enums
@@ -6,7 +7,7 @@ from typing import AsyncGenerator, Optional, Union
 
 async def search_messages_by_date(
     app: Client,
-    chat_id: int | str,
+    chat_id: Union[int, str],
     *,
     filter: Optional[enums.MessagesFilter] = None,
     query: str = "",

@@ -4,7 +4,7 @@ from pyrogram import errors
 from pyrogram.types import Chat, Message
 from pyrogram.errors import SessionPasswordNeeded
 from datetime import datetime
-from search_messages_by_date import search_messages_by_date  # type:ignore
+from .search_messages_by_date import search_messages_by_date  # type:ignore
 from threading import Lock
 import platform
 import subprocess
