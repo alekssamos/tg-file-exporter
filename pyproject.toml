@@ -1,6 +1,6 @@
 [project]
 name = "tg-file-exporter"
-version = "1.1.13"
+version = "1.1.14"
 description = "Download all files from Telegram chat"
 authors = [{ name = "Alexey", email = "aleks-samos@yandex.ru" }]
 readme = "README.md"
@@ -24,3 +24,4 @@ dev = [
 
 [tool.mypy]
 check_untyped_defs=true
+disable_error_code = ["import-untyped"]

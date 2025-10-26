@@ -4,7 +4,10 @@ from pyrogram import errors
 from pyrogram.types import Chat, Message
 from pyrogram.errors import SessionPasswordNeeded
 from datetime import datetime
+from search_messages_by_date import search_messages_by_date  # type:ignore
 from threading import Lock
+import platform
+import subprocess
 from loguru import logger
 import wx  # type:ignore
 import wx.adv  # type:ignore
@@ -15,7 +18,7 @@ from wxasync import AsyncBind, WxAsyncApp, StartCoroutine  # type:ignore
 import os
 import sys
 
-MAX_WORKERS = 5
+MAX_WORKERS = 4
 NEXT_BUTTON_LABEL = "&Далее>"
 LOCK = Lock()
 
@@ -106,8 +109,9 @@ class ExportWizard(wx.Frame):
         self.client = client
         self.auth_data = AuthData(None, None)
         self.errors_count: int = 0
+        self.success_count: int = 0
         self.close_running: bool = False
-        self.completed_export:bool = False
+        self.completed_export: bool = False
         self.main_panel = wx.Panel(self)
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
         self.main_panel.SetSizer(self.main_sizer)
@@ -148,7 +152,9 @@ class ExportWizard(wx.Frame):
 
     def on_gh(self, event):
         import webbrowser
+
         webbrowser.open("https://github.com/alekssamos/tg-file-exporter/")
+
     def on_key_up(self, event):
         key = event.GetKeyCode()
         event.Skip()
@@ -248,7 +254,7 @@ class ExportWizard(wx.Frame):
     async def on_next(self, event):
         logger.debug(f"next: current_step={self.current_step}")
         ############### events ###<
-        autoskip:bool = False
+        autoskip: bool = False
         # отправить код
         if self.current_step == 0:
             await self.steps[self.current_step].on_send_code(None)
@@ -258,7 +264,7 @@ class ExportWizard(wx.Frame):
             # проверить нужен ли пароль?
             if not self.steps[self.current_step].password_needed:
                 self.current_step = 3
-                autoskip=True
+                autoskip = True
             else:
                 await self.steps[2].set_password_hint()
         # Проверить пароль
@@ -336,46 +342,37 @@ class ExportWizard(wx.Frame):
         wx.CallAfter(self.steps[-1].update_progress, "Экспорт начат...")
 
         # параметры поиска
-        kwargs = {"chat_id": chat.chat.id, "filter": message_filter}
-        try:
-            # Использовать search_messages_count для подсчёта
-            # total = await self.client.search_messages_count(**kwargs)
-            # к сожалению, нельзя указать дату в search_messages_count
-            i = 0  # счётчик для прогресса
-            # заполняем дату и тему, если указана
-            if min_date:
-                kwargs["min_date"] = min_date
-                logger.info(f"min_date={min_date}")
-            if max_date:
-                kwargs["max_date"] = max_date
-                logger.info(f"max_date={max_date}")
-            if topic:
-                kwargs["message_thread_id"] = topic
-                logger.info(f"topic={topic}")
-            # Использовать search_messages для фильтрации
-            async for message in self.client.search_messages(**kwargs):
-                await self.q.put((message, path))
-                wx.CallAfter(self.steps[-1].update_progress, f"Скачано {i + 1}")
-                i += 1
+        kwargs = {"app": self.client, "chat_id": chat.chat.id, "filter": message_filter}
+        # заполняем дату и тему, если указана
+        if min_date:
+            kwargs["min_date"] = min_date
+            logger.info(f"min_date={min_date}")
+        if max_date:
+            kwargs["max_date"] = max_date
+            logger.info(f"max_date={max_date}")
+        if topic:
+            kwargs["message_thread_id"] = topic
+            logger.info(f"topic={topic}")
+        # Использовать search_messages для фильтрации
+        async for message in search_messages_by_date(**kwargs):
+            await self.q.put((message, path))
 
-            await self.q.join()
-            self.completed_export = True
-            wx.CallAfter(
-                self.steps[-1].update_progress,
-                f"Экспорт завершен! Скачано {i} файлов, {self.errors_count} ошибок.",
-            )
-            wx.CallAfter(
-                wx.MessageBox,
-                f"Экспорт завершен!  Скачано {i} файлов,  {self.errors_count} ошибок.",
-                "Информация",
-                wx.OK | wx.ICON_INFORMATION,
-            )
-        except Exception as e:
-            logger.exception("error in export")
-            wx.CallAfter(self.steps[-1].update_progress, f"Ошибка: {str(e)}")
-        finally:
-            self.cancel_button.SetLabel("&Готово")
-            self.cancel_button.SetFocus()
+        await self.q.join()
+        self.completed_export = True
+        self.cancel_button.SetLabel("&Готово")
+        self.cancel_button.SetFocus()
+        wx.CallAfter(
+            self.steps[-1].update_progress,
+            f"Экспорт завершен! Скачано {self.success_count} файлов, {self.errors_count} ошибок.",
+        )
+        wx.CallAfter(
+            wx.MessageBox,
+            f"Экспорт завершен!  Скачано {self.success_count} файлов,  {self.errors_count} ошибок.",
+            "Информация",
+            wx.OK | wx.ICON_INFORMATION,
+        )
+        if platform.platform().startswith("Win"):
+            subprocess.call(["explorer.exe", path])
 
     @logger.catch
     async def download_media_worker(self):
@@ -403,16 +400,26 @@ class ExportWizard(wx.Frame):
                         await message.download(path + file_name)
                     else:
                         logger.info(f"file {file_name} already exists, skiping...")
+                with LOCK:
+                    self.success_count += 1
+                wx.CallAfter(
+                    self.steps[-1].update_progress, f"Скачано {self.success_count}"
+                )
+
             except (
                 errors.RPCError,
                 ValueError,
                 AttributeError,
                 OSError,
                 FileExistsError,
-            ):
+            ) as e:
                 logger.exception("error in worker")
                 with LOCK:
                     self.errors_count += 1
+                wx.CallAfter(
+                    self.steps[-1].update_progress,
+                    f"Ошибка #{self.errors_count}: {str(e)}",
+                )
             finally:
                 try:
                     self.q.task_done()
