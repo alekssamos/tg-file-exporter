@@ -8,7 +8,6 @@ from typing import AsyncGenerator, Optional, Union
 async def search_messages_by_date(
     app: Client,
     chat_id: Union[int, str],
-    *,
     filter: Optional[enums.MessagesFilter] = None,
     query: str = "",
     min_date: Optional[datetime] = None,

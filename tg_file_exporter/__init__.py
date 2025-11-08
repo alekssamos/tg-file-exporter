@@ -26,7 +26,7 @@ logger.remove()
 if not getattr(sys, "frozen", False):
     logger.add(
         sys.stderr,
-        level="DEBUG",
+        level="INFO",
         format="<green>{time:HH:mm:ss.SSS}</green> <level>{message}</level>   <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan>",
         backtrace=True,
         diagnose=True,
@@ -64,8 +64,10 @@ def WxToPyDate(date: wx._core.DateTime, is_end: bool = False) -> datetime:
         hour = 23
         minute = 59
         second = 59
+    logger.debug(f"wx date is {date}")
+    # Undocumented: wx DateTime returns Month from 0, not from 1
     return datetime(
-        date.GetYear(), date.GetMonth(), date.GetDay(), hour, minute, second
+        date.GetYear(), date.GetMonth()+1, date.GetDay(), hour, minute, second
     )
 
 
@@ -354,7 +356,9 @@ class ExportWizard(wx.Frame):
             kwargs["message_thread_id"] = topic
             logger.info(f"topic={topic}")
         # Использовать search_messages для фильтрации
+        i:int=0
         async for message in search_messages_by_date(**kwargs):
+            i+=1
             await self.q.put((message, path))
 
         await self.q.join()
