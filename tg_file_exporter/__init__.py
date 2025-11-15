@@ -385,15 +385,15 @@ class ExportWizard(wx.Frame):
                 message, path = await self.q.get()
                 if not path.endswith(os.path.sep):
                     path = path + os.path.sep
-                # https://docs.kurigram.live/api/types/Message/
-                media = getattr(message, message.media.value)
                 # Скачать медиа
                 if message.media not in [
                     enums.MessageMediaType.AUDIO,
                     enums.MessageMediaType.DOCUMENT,
                 ]:
                     await message.download(path)
-                else:
+                elif hasattr(message.media, "value"):
+                    # https://docs.kurigram.live/api/types/Message/
+                    media = getattr(message, message.media.value)
                     file_name = media.file_name
                     for simbel in r"""{}/\'*<>"~""":
                         if simbel in file_name:
