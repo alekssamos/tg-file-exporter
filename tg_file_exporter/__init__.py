@@ -67,7 +67,7 @@ def WxToPyDate(date: wx._core.DateTime, is_end: bool = False) -> datetime:
     logger.debug(f"wx date is {date}")
     # Undocumented: wx DateTime returns Month from 0, not from 1
     return datetime(
-        date.GetYear(), date.GetMonth()+1, date.GetDay(), hour, minute, second
+        date.GetYear(), date.GetMonth() + 1, date.GetDay(), hour, minute, second
     )
 
 
@@ -356,9 +356,9 @@ class ExportWizard(wx.Frame):
             kwargs["message_thread_id"] = topic
             logger.info(f"topic={topic}")
         # Использовать search_messages для фильтрации
-        i:int=0
+        i: int = 0
         async for message in search_messages_by_date(**kwargs):
-            i+=1
+            i += 1
             await self.q.put((message, path))
 
         await self.q.join()
@@ -395,6 +395,9 @@ class ExportWizard(wx.Frame):
                     await message.download(path)
                 else:
                     file_name = media.file_name
+                    for simbel in r"""{}/\'*<>"~""":
+                        if simbel in file_name:
+                            file_name = file_name.replace(simbel, "_")
                     file_name_parts = file_name.split(".")
                     ext = file_name_parts.pop()
                     file_name_parts.append(str(message.id))
