@@ -273,7 +273,7 @@ class AdvancedDialogsCache:
             pinned_index = 0
 
             async for dialog in self.client.get_dialogs():
-                if dialog.pinned:
+                if dialog.is_pinned:
                     pinned_order = pinned_index
                     pinned_index += 1
                 else:

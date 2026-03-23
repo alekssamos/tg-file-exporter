@@ -376,7 +376,7 @@ class ExportWizard(wx.Frame):
 
         await self.q.join()
         if self.only_links:
-            with open(os.path.join(path, "links_"+str(chat.chat.id)+".html"), "w") as fpl:
+            with open(os.path.join(path, "links_"+str(chat.chat.id)+".html"), "w", encoding="UTF-8") as fpl:
                 fpl.write("""
 <!DOCTYPE html>
 <html>
