@@ -5,6 +5,7 @@ from pyrogram.types import Chat, Message
 from pyrogram.errors import SessionPasswordNeeded
 from datetime import datetime
 from .search_messages_by_date import search_messages_by_date  # type:ignore
+from .advanced_dialogs_cache import AdvancedDialogsCache  # type:ignore
 from threading import Lock
 import platform
 import subprocess
@@ -114,6 +115,8 @@ class ExportWizard(wx.Frame):
         self.success_count: int = 0
         self.close_running: bool = False
         self.completed_export: bool = False
+        self.only_links: bool = False
+        self.messages_with_links: list = []
         self.main_panel = wx.Panel(self)
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
         self.main_panel.SetSizer(self.main_sizer)
@@ -185,11 +188,18 @@ class ExportWizard(wx.Frame):
         # Шаг 8: Экспорт
         self.steps.append(ExportStep(self.main_panel, self.client))
 
+    async def check_auth(self) -> bool:
+        try:
+            await self.client.get_me()
+            return True
+        except errors.exceptions.unauthorized_401.AuthKeyUnregistered:
+            return False
+        return False
     @logger.catch
     async def show_step(self, step_index):
         # Пропустить шаги авторизации если авторизован
         if step_index == 0:
-            if await self.client.connect():
+            if (await self.client.connect()) and (await self.check_auth()):
                 step_index = 3  # Пропустить к выбору чата
                 self.current_step = step_index
                 logger.info("already authorized")
@@ -337,6 +347,9 @@ class ExportWizard(wx.Frame):
         message_filter = self.steps[6].filters_choices[
             self.steps[6].choice_file_type.GetSelection()
         ][1]
+        self.only_links = self.steps[6].filters_choices[
+            self.steps[6].choice_file_type.GetSelection()
+        ][1] == enums.MessagesFilter.URL
         if self.steps[6].checkbox_period.IsChecked():
             min_date = WxToPyDate(self.steps[6].start_date.GetValue())
             max_date = WxToPyDate(self.steps[6].end_date.GetValue(), True)
@@ -362,6 +375,21 @@ class ExportWizard(wx.Frame):
             await self.q.put((message, path))
 
         await self.q.join()
+        if self.only_links:
+            with open(os.path.join(path, "links_"+chat.chat.id+".html"), "w") as fpl:
+                fpl.write("""
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{chat_title}</title>
+</head>
+<body>
+<p>{links}</p>
+</body>
+</html>
+                """.format(chat_title=_getChatTitle(chat.chat), links=" <hr>\n".join(self.messages_with_links)))
         self.completed_export = True
         self.cancel_button.SetLabel("&Готово")
         self.cancel_button.SetFocus()
@@ -385,28 +413,32 @@ class ExportWizard(wx.Frame):
                 message, path = await self.q.get()
                 if not path.endswith(os.path.sep):
                     path = path + os.path.sep
-                # Скачать медиа
-                if message.media not in [
-                    enums.MessageMediaType.AUDIO,
-                    enums.MessageMediaType.DOCUMENT,
-                ]:
-                    await message.download(path)
-                elif hasattr(message.media, "value"):
-                    # https://docs.kurigram.live/api/types/Message/
-                    media = getattr(message, message.media.value)
-                    file_name = media.file_name
-                    for simbel in r"""{}/\'*<>"~""":
-                        if simbel in file_name:
-                            file_name = file_name.replace(simbel, "_")
-                    file_name_parts = file_name.split(".")
-                    ext = file_name_parts.pop()
-                    file_name_parts.append(str(message.id))
-                    file_name_parts.append(ext)
-                    file_name = ".".join(file_name_parts)
-                    if not os.path.isfile(path + file_name):
-                        await message.download(path + file_name)
-                    else:
-                        logger.info(f"file {file_name} already exists, skiping...")
+                # собрать сообщения со ссылками
+                if self.only_links:
+                    self.messages_with_links.append( message.text.html )
+                if not self.only_links:
+                    # Скачать медиа
+                    if message.media not in [
+                        enums.MessageMediaType.AUDIO,
+                        enums.MessageMediaType.DOCUMENT,
+                    ]:
+                        await message.download(path)
+                    elif hasattr(message.media, "value"):
+                        # https://docs.kurigram.live/api/types/Message/
+                        media = getattr(message, message.media.value)
+                        file_name = media.file_name
+                        for simbel in r"""{}/\'*<>"~""":
+                            if simbel in file_name:
+                                file_name = file_name.replace(simbel, "_")
+                        file_name_parts = file_name.split(".")
+                        ext = file_name_parts.pop()
+                        file_name_parts.append(str(message.id))
+                        file_name_parts.append(ext)
+                        file_name = ".".join(file_name_parts)
+                        if not os.path.isfile(path + file_name):
+                            await message.download(path + file_name)
+                        else:
+                            logger.info(f"file {file_name} already exists, skiping...")
                 with LOCK:
                     self.success_count += 1
                 wx.CallAfter(
@@ -421,6 +453,7 @@ class ExportWizard(wx.Frame):
                 FileExistsError,
             ) as e:
                 logger.exception("error in worker")
+                await message.forward("me")
                 with LOCK:
                     self.errors_count += 1
                 wx.CallAfter(
@@ -601,7 +634,8 @@ class ChatSelectionStep(WizardStep):
         try:
             self.chat_list.Clear()
             self.chats = []
-            async for dialog in self.client.get_dialogs():
+            adc = AdvancedDialogsCache(self.client)
+            async for dialog in adc.iter_dialogs():
                 self.chats.append(dialog)
                 tm = ""
                 if dialog.top_message:
@@ -778,6 +812,7 @@ class FileTypeSelectionStep(WizardStep):
             ("Фото и видео", enums.MessagesFilter.PHOTO_VIDEO),
             ("Файлы", enums.MessagesFilter.DOCUMENT),
             ("Голосовые", enums.MessagesFilter.AUDIO_VIDEO_NOTE),
+            ("Ссылки", enums.MessagesFilter.URL),
         )
         self.choice_file_type = wx.Choice(
             self, choices=[c[0] for c in self.filters_choices]

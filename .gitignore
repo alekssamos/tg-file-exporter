@@ -5,6 +5,9 @@
 # Pyrogram
 *.session*
 
+# dialogs
+*.db*
+
 # logs
 *.log
 
