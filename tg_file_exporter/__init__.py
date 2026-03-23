@@ -376,7 +376,7 @@ class ExportWizard(wx.Frame):
 
         await self.q.join()
         if self.only_links:
-            with open(os.path.join(path, "links_"+chat.chat.id+".html"), "w") as fpl:
+            with open(os.path.join(path, "links_"+str(chat.chat.id)+".html"), "w") as fpl:
                 fpl.write("""
 <!DOCTYPE html>
 <html>
@@ -417,6 +417,8 @@ class ExportWizard(wx.Frame):
                 # собрать сообщения со ссылками
                 if self.only_links:
                     m = message.text or message.caption
+                    if m is None:
+                        continue
                     self.messages_with_links.append( m.html )
                 if not self.only_links:
                     # Скачать медиа
