@@ -242,7 +242,7 @@ class AdvancedDialogsCache:
             pickle.dumps(dialog),
             int(time.time()),
             getattr(dialog, "folder_id", 0),
-            int(dialog.pinned),
+            int(dialog.is_pinned),
             pinned_order
         )
 

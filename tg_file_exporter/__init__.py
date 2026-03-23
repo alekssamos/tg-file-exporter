@@ -390,6 +390,7 @@ class ExportWizard(wx.Frame):
 </body>
 </html>
                 """.format(chat_title=_getChatTitle(chat.chat), links=" <hr>\n".join(self.messages_with_links)))
+            self.messages_with_links.clear()
         self.completed_export = True
         self.cancel_button.SetLabel("&Готово")
         self.cancel_button.SetFocus()
@@ -415,7 +416,8 @@ class ExportWizard(wx.Frame):
                     path = path + os.path.sep
                 # собрать сообщения со ссылками
                 if self.only_links:
-                    self.messages_with_links.append( message.text.html )
+                    m = message.text or message.caption
+                    self.messages_with_links.append( m.html )
                 if not self.only_links:
                     # Скачать медиа
                     if message.media not in [
