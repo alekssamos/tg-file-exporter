@@ -46,6 +46,40 @@ else:
     logger.info("program is a .py script")
 
 
+def _links_to_html(
+    entities: list,
+    plain_text: str,
+    html_text: str
+) -> str:
+    urls = []
+
+    for ent in entities:
+        if ent.type != enums.MessageEntityType.URL:
+            continue
+        
+        start = ent.offset
+        end = start + ent.length
+        
+        urls.append( plain_text[start:end] )
+    content = html_text
+    for url in urls:
+        content = content.replace(url, '<a href="{url}">{url}</a>'.format(url=url), 1)
+    return content
+
+
+def _wrap_message(message: Message)->str:
+    dt = message.date
+    formatted_date = f"{dt.hour}:{dt.strftime('%M:%S (%d.%m.%Y)')}" if dt else ""
+    t = message.caption or message.text
+    e = message.entities or message.caption_entities or []
+    message_content = _links_to_html(e, t, t.html)  # type:ignore
+    return f"""
+<div class="message" id="msg{message.id}">
+<h3>{formatted_date}</h3>
+<p>{message_content}</p>
+</div>
+    """
+
 def save_path(path=""):
     _filename = os.path.join(tempfile.gettempdir(), "tg_file_exporter_selected_dir")
     if path:
@@ -386,10 +420,18 @@ class ExportWizard(wx.Frame):
 <title>{chat_title}</title>
 </head>
 <body>
+<header>
+<h2>{chat_title}</h2>
+</header>
+<main>
 <p>{links}</p>
+</main>
+<footer>
+<p>Powered by tg-file-exporter</p>
+</footer>
 </body>
 </html>
-                """.format(chat_title=_getChatTitle(chat.chat), links=" <hr>\n".join(self.messages_with_links)))
+                """.format(chat_title=_getChatTitle(chat.chat), links="\n".join(self.messages_with_links)))
             self.messages_with_links.clear()
         self.completed_export = True
         self.cancel_button.SetLabel("&Готово")
@@ -416,10 +458,9 @@ class ExportWizard(wx.Frame):
                     path = path + os.path.sep
                 # собрать сообщения со ссылками
                 if self.only_links:
-                    m = message.text or message.caption
-                    if m is None:
+                    if (message.text or message.caption) is None:
                         continue
-                    self.messages_with_links.append( m.html )
+                    self.messages_with_links.append( _wrap_message(message) )
                 if not self.only_links:
                     # Скачать медиа
                     if message.media not in [
