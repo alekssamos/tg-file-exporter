@@ -62,8 +62,16 @@ def _links_to_html(
         
         urls.append( plain_text[start:end] )
     content = html_text
+    prefix = ""
+    replaced = set()
     for url in urls:
-        content = content.replace(url, '<a href="{url}">{url}</a>'.format(url=url), 1)
+        if url in replaced:
+            continue
+        prefix = ""
+        if "://" not in url:
+            prefix = "http://"
+        content = content.replace(url, '<a href="{prefix_url}">{url}</a>'.format(prefix_url=prefix+url, url=url), 1)
+        replaced.add(url)
     return content
 
 
@@ -424,7 +432,7 @@ class ExportWizard(wx.Frame):
 <h2>{chat_title}</h2>
 </header>
 <main>
-<p>{links}</p>
+<div class="messages">{links}</div>
 </main>
 <footer>
 <p>Powered by tg-file-exporter</p>
