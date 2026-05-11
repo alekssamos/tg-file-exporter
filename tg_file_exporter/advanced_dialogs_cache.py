@@ -2,8 +2,9 @@
 import asyncio
 import pickle
 import time
-from typing import AsyncIterator, Optional, Set, List
+from typing import AsyncIterator, Optional, Set
 
+from loguru import logger
 import aiosqlite
 from pyrogram import Client, filters
 from pyrogram.handlers import MessageHandler
@@ -36,6 +37,7 @@ class AdvancedDialogsCache:
         self._queue = asyncio.Queue()
 
         self._sync_started = False
+        self._streamed = False
 
     # ---------------- INIT ----------------
 
@@ -79,10 +81,7 @@ class AdvancedDialogsCache:
 
     # ---------------- PUBLIC API ----------------
 
-    async def iter_dialogs(
-        self,
-        folder_id: Optional[int] = None
-    ) -> AsyncIterator:
+    async def iter_dialogs(self, folder_id: Optional[int] = None) -> AsyncIterator:
         """
         Главный streaming API:
         - сначала кеш
@@ -98,88 +97,53 @@ class AdvancedDialogsCache:
         # -------- CACHE --------
         w = "WHERE folder_id = ?" if folder_id is not None else ""
         binds = (folder_id,) if folder_id is not None else tuple()
-        async with self._db.execute("""
+        logger.debug("load dialogs from db")
+        async with self._db.execute(
+            """
             SELECT chat_id, raw FROM dialogs
             {w}
             ORDER BY
                 is_pinned DESC,
                 pinned_order ASC,
                 date DESC
-        """.format(w=w), binds) as cursor:
+        """.format(w=w),
+            binds,
+        ) as cursor:
             async for chat_id, raw in cursor:
                 yielded.add(chat_id)
                 yield pickle.loads(raw)
 
         # -------- TELEGRAM STREAM --------
-        async for dialog in self.client.get_dialogs():
-            if folder_id is not None and getattr(dialog, "folder_id", 0) != folder_id:
-                continue
+        if not self._streamed:
+            self._streamed = True
+            logger.debug("load dialogs from Telegram")
+            async for dialog in self.client.get_dialogs():
+                if (
+                    folder_id is not None
+                    and getattr(dialog, "folder_id", 0) != folder_id
+                ):
+                    continue
 
-            cid = dialog.chat.id
+                cid = dialog.chat.id
 
-            if cid in yielded:
-                continue
+                if cid in yielded:
+                    continue
 
-            yielded.add(cid)
+                yielded.add(cid)
 
-            yield dialog
+                yield dialog
 
-            asyncio.create_task(self._upsert_dialog(dialog))
+                asyncio.create_task(self._upsert_dialog(dialog))
 
         # -------- BACKGROUND SYNC --------
         if not self._sync_started:
             self._sync_started = True
             asyncio.create_task(self._background_sync())
 
-    # ---------------- PAGINATION ----------------
-
-    async def get_page(
-        self,
-        folder_id: int = 0,
-        limit: int = 50,
-        offset: int = 0
-    ) -> List:
-        """
-        Smart pagination:
-
-        - pinned всегда на первой странице
-        - pinned НЕ считаются в offset
-        """
-
-        if not self._db:
-            await self.init()
-
-        result = []
-
-        # -------- PINNED (ONLY FIRST PAGE) --------
-        if offset == 0:
-            async with self._db.execute("""
-                SELECT raw FROM dialogs
-                WHERE folder_id = ? AND is_pinned = 1
-                ORDER BY pinned_order ASC
-            """, (folder_id,)) as cursor:
-                async for (raw,) in cursor:
-                    result.append(pickle.loads(raw))
-
-        # -------- NORMAL --------
-        async with self._db.execute("""
-            SELECT raw FROM dialogs
-            WHERE folder_id = ? AND is_pinned = 0
-            ORDER BY date DESC
-            LIMIT ? OFFSET ?
-        """, (folder_id, limit, offset)) as cursor:
-            async for (raw,) in cursor:
-                result.append(pickle.loads(raw))
-
-        return result
-
     # ---------------- REALTIME ----------------
 
     def _setup_realtime(self):
-        self.client.add_handler(
-            MessageHandler(self._on_message, filters.all),
-            group=0
-        )
+        self.client.add_handler(MessageHandler(self._on_message, filters.all), group=0)
 
     async def _on_message(self, client, message):
         await self._queue.put(message)
@@ -205,19 +169,22 @@ class AdvancedDialogsCache:
         rows = []
 
         for msg in messages:
-            rows.append((
-                msg.chat.id,
-                int(msg.date.timestamp()),
-                msg.id,
-                pickle.dumps(msg),
-                int(time.time()),
-                0,   # folder неизвестен в realtime
-                0,
-                None
-            ))
+            rows.append(
+                (
+                    msg.chat.id,
+                    int(msg.date.timestamp()),
+                    msg.id,
+                    pickle.dumps(msg),
+                    int(time.time()),
+                    0,  # folder неизвестен в realtime
+                    0,
+                    None,
+                )
+            )
 
         async with self._write_lock:
-            await self._db.executemany("""
+            await self._db.executemany(
+                """
             INSERT INTO dialogs (
                 chat_id, date, top_message_id, raw, updated_at,
                 folder_id, is_pinned, pinned_order
@@ -228,7 +195,9 @@ class AdvancedDialogsCache:
                 top_message_id=excluded.top_message_id,
                 raw=excluded.raw,
                 updated_at=excluded.updated_at
-            """, rows)
+            """,
+                rows,
+            )
 
             await self._db.commit()
 
@@ -243,11 +212,12 @@ class AdvancedDialogsCache:
             int(time.time()),
             getattr(dialog, "folder_id", 0),
             int(dialog.is_pinned),
-            pinned_order
+            pinned_order,
         )
 
         async with self._write_lock:
-            await self._db.execute("""
+            await self._db.execute(
+                """
             INSERT INTO dialogs (
                 chat_id, date, top_message_id, raw, updated_at,
                 folder_id, is_pinned, pinned_order
@@ -261,13 +231,16 @@ class AdvancedDialogsCache:
                 folder_id=excluded.folder_id,
                 is_pinned=excluded.is_pinned,
                 pinned_order=excluded.pinned_order
-            """, row)
+            """,
+                row,
+            )
 
             await self._db.commit()
 
     # ---------------- FULL SYNC ----------------
 
     async def _background_sync(self):
+        logger.debug("load dialogs from Telegram")
         async with self._write_lock:
             rows = []
             pinned_index = 0
@@ -279,16 +252,20 @@ class AdvancedDialogsCache:
                 else:
                     pinned_order = None
 
-                rows.append((
-                    dialog.chat.id,
-                    int(dialog.top_message.date.timestamp()) if dialog.top_message else 0,
-                    dialog.top_message.id if dialog.top_message else None,
-                    pickle.dumps(dialog),
-                    int(time.time()),
-                    getattr(dialog, "folder_id", 0),
-                    int(dialog.pinned),
-                    pinned_order
-                ))
+                rows.append(
+                    (
+                        dialog.chat.id,
+                        int(dialog.top_message.date.timestamp())
+                        if dialog.top_message
+                        else 0,
+                        dialog.top_message.id if dialog.top_message else None,
+                        pickle.dumps(dialog),
+                        int(time.time()),
+                        getattr(dialog, "folder_id", 0),
+                        int(dialog.is_pinned),
+                        pinned_order,
+                    )
+                )
 
                 if len(rows) >= self.batch_size:
                     await self._flush(rows)
@@ -298,7 +275,8 @@ class AdvancedDialogsCache:
                 await self._flush(rows)
 
     async def _flush(self, rows):
-        await self._db.executemany("""
+        await self._db.executemany(
+            """
         INSERT INTO dialogs (
             chat_id, date, top_message_id, raw, updated_at,
             folder_id, is_pinned, pinned_order
@@ -312,7 +290,9 @@ class AdvancedDialogsCache:
             folder_id=excluded.folder_id,
             is_pinned=excluded.is_pinned,
             pinned_order=excluded.pinned_order
-        """, rows)
+        """,
+            rows,
+        )
 
         await self._db.commit()
 

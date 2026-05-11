@@ -6,6 +6,7 @@ from pyrogram.errors import SessionPasswordNeeded
 from datetime import datetime
 from .search_messages_by_date import search_messages_by_date  # type:ignore
 from .advanced_dialogs_cache import AdvancedDialogsCache  # type:ignore
+from .search_text import search_chat
 from threading import Lock
 import platform
 import subprocess
@@ -46,21 +47,17 @@ else:
     logger.info("program is a .py script")
 
 
-def _links_to_html(
-    entities: list,
-    plain_text: str,
-    html_text: str
-) -> str:
+def _links_to_html(entities: list, plain_text: str, html_text: str) -> str:
     urls = []
 
     for ent in entities:
         if ent.type != enums.MessageEntityType.URL:
             continue
-        
+
         start = ent.offset
         end = start + ent.length
-        
-        urls.append( plain_text[start:end] )
+
+        urls.append(plain_text[start:end])
     content = html_text
     prefix = ""
     replaced = set()
@@ -70,12 +67,16 @@ def _links_to_html(
         prefix = ""
         if "://" not in url:
             prefix = "http://"
-        content = content.replace(url, '<a href="{prefix_url}">{url}</a>'.format(prefix_url=prefix+url, url=url), 1)
+        content = content.replace(
+            url,
+            '<a href="{prefix_url}">{url}</a>'.format(prefix_url=prefix + url, url=url),
+            1,
+        )
         replaced.add(url)
     return content
 
 
-def _wrap_message(message: Message)->str:
+def _wrap_message(message: Message) -> str:
     dt = message.date
     formatted_date = f"%d.%m.%Y {dt.hour}:{dt.strftime('%M:%S')}" if dt else ""
     t = message.caption or message.text
@@ -87,6 +88,7 @@ def _wrap_message(message: Message)->str:
 <p>{message_content}</p>
 </div>
     """
+
 
 def save_path(path=""):
     _filename = os.path.join(tempfile.gettempdir(), "tg_file_exporter_selected_dir")
@@ -237,6 +239,7 @@ class ExportWizard(wx.Frame):
         except errors.exceptions.unauthorized_401.AuthKeyUnregistered:
             return False
         return False
+
     @logger.catch
     async def show_step(self, step_index):
         # Пропустить шаги авторизации если авторизован
@@ -365,7 +368,7 @@ class ExportWizard(wx.Frame):
         event.Skip()
         self.Close()
         self.Destroy()
-        await asyncio.sleep(0.5)
+        raise SystemExit
 
     @logger.catch
     async def start_export(self):
@@ -389,9 +392,12 @@ class ExportWizard(wx.Frame):
         message_filter = self.steps[6].filters_choices[
             self.steps[6].choice_file_type.GetSelection()
         ][1]
-        self.only_links = self.steps[6].filters_choices[
-            self.steps[6].choice_file_type.GetSelection()
-        ][1] == enums.MessagesFilter.URL
+        self.only_links = (
+            self.steps[6].filters_choices[
+                self.steps[6].choice_file_type.GetSelection()
+            ][1]
+            == enums.MessagesFilter.URL
+        )
         if self.steps[6].checkbox_period.IsChecked():
             min_date = WxToPyDate(self.steps[6].start_date.GetValue())
             max_date = WxToPyDate(self.steps[6].end_date.GetValue(), True)
@@ -418,8 +424,13 @@ class ExportWizard(wx.Frame):
 
         await self.q.join()
         if self.only_links:
-            with open(os.path.join(path, "links_"+str(chat.chat.id)+".html"), "w", encoding="UTF-8") as fpl:
-                fpl.write("""
+            with open(
+                os.path.join(path, "links_" + str(chat.chat.id) + ".html"),
+                "w",
+                encoding="UTF-8",
+            ) as fpl:
+                fpl.write(
+                    """
 <!DOCTYPE html>
 <html>
 <head>
@@ -439,7 +450,11 @@ class ExportWizard(wx.Frame):
 </footer>
 </body>
 </html>
-                """.format(chat_title=_getChatTitle(chat.chat), links="\n".join(self.messages_with_links)))
+                """.format(
+                        chat_title=_getChatTitle(chat.chat),
+                        links="\n".join(self.messages_with_links),
+                    )
+                )
             self.messages_with_links.clear()
         self.completed_export = True
         self.cancel_button.SetLabel("&Готово")
@@ -468,7 +483,7 @@ class ExportWizard(wx.Frame):
                 if self.only_links:
                     if (message.text or message.caption) is None:
                         continue
-                    self.messages_with_links.append( _wrap_message(message) )
+                    self.messages_with_links.append(_wrap_message(message))
                 if not self.only_links:
                     # Скачать медиа
                     if message.media not in [
@@ -663,39 +678,70 @@ class ChatSelectionStep(WizardStep):
         super().__init__(parent)
         logger.debug("ChatSelectionStep")
         self.client = client
+        self.folders = [
+            None,
+        ]
+        self._folders = []
+        self.selected_folder = None
         self.chats = []
         self.selected_chat = None
         self.update_chats_thread = None
+        if not hasattr(self, "adc"):
+            self.adc = AdvancedDialogsCache(self.client)
 
+        self.folder_list = wx.ListBox(self)
+        self.folder_list.Disable()
+        self.folder_list.Hide()
         self.chat_list = wx.ListBox(self)
         self.search_input = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
-        self.search_input.Disable()
-        self.search_button = wx.Button(self, label="Поиск")
-        self.search_button.Disable()
+        # self.search_input.Disable()
+        # self.search_button = wx.Button(self, label="Поиск")
+        # self.search_button.Disable()
 
-        AsyncBind(wx.EVT_TEXT_ENTER, self.on_search, self.search_input)
-        AsyncBind(wx.EVT_BUTTON, self.on_search, self.search_button)
+        AsyncBind(wx.EVT_KEY_UP, self.on_search, self.search_input)
+        # AsyncBind(wx.EVT_BUTTON, self.on_search, self.search_button)
+        self.folder_list.Bind(wx.EVT_LISTBOX, self.on_folder_select)
         self.chat_list.Bind(wx.EVT_LISTBOX, self.on_chat_select)
 
+        self.step_sizer.Add(self.folder_list, 1, wx.EXPAND | wx.ALL, 5)
         self.step_sizer.Add(wx.StaticText(self, label="Выберите чат:"), 0, wx.ALL, 5)
         self.step_sizer.Add(self.search_input, 0, wx.EXPAND | wx.ALL, 5)
-        self.step_sizer.Add(self.search_button, 0, wx.ALL, 5)
+        # self.step_sizer.Add(self.search_button, 0, wx.ALL, 5)
         self.step_sizer.Add(self.chat_list, 1, wx.EXPAND | wx.ALL, 5)
+        self.folder_list.Append("Все чаты")
+        self.folder_list.SetSelection(0)
 
     @logger.catch
     async def load_chats(self):
         try:
+            if not self._folders:
+                self._folders = await self.client.get_folders()
+            for folder in self._folders:
+                self.folders.append(folder)
+                wx.CallAfter(
+                    self.folder_list.Append,
+                    folder.name,
+                )
             self.chat_list.Clear()
             self.chats = []
-            adc = AdvancedDialogsCache(self.client)
-            async for dialog in adc.iter_dialogs():
-                self.chats.append(dialog)
+            folder_id = self.selected_folder.id if self.selected_folder else None
+            async for dialog in self.adc.iter_dialogs(folder_id):
                 tm = ""
                 if dialog.top_message:
                     tm = dialog.top_message.text or dialog.top_message.caption or ""
+                chatline = f"{_getChatTitle(dialog.chat)} ({tm})"
+                if (
+                    self.search_input.GetValue()
+                    and self.search_input.GetValue().strip()
+                ):
+                    if not search_chat(
+                        _getChatTitle(dialog.chat), self.search_input.GetValue().strip()
+                    ):
+                        continue
+                self.chats.append(dialog)
                 wx.CallAfter(
                     self.chat_list.Append,
-                    f"{_getChatTitle(dialog.chat)} ({tm})",
+                    chatline,
                 )
         except Exception as e:
             logger.exception("error in update dialogs")
@@ -717,6 +763,14 @@ class ChatSelectionStep(WizardStep):
 
     @logger.catch
     async def on_search(self, event):
+        event.Skip()
+        kc = event.GetKeyCode()
+        if (kc >= 300 and kc <= 350) or kc in [9, 10, 27]:
+            return
+        if self.update_chats_thread:
+            self.update_chats_thread.cancel()
+        self.update_chats_thread = StartCoroutine(self.load_chats(), self)
+        return
         query = (self.search_input.GetValue() or "").strip()
         if query:
             try:
@@ -736,7 +790,17 @@ class ChatSelectionStep(WizardStep):
         else:
             wx.CallAfter(self.update_chat_list, self.chats)
 
+    def on_folder_select(self, event):
+        event.Skip()
+        index = self.folder_list.GetSelection()
+        if index != wx.NOT_FOUND:
+            self.selected_folder = self.folders[index]
+        if self.update_chats_thread:
+            self.update_chats_thread.cancel()
+        self.update_chats_thread = StartCoroutine(self.load_chats(), self)
+
     def on_chat_select(self, event):
+        event.Skip()
         index = self.chat_list.GetSelection()
         if index != wx.NOT_FOUND:
             self.selected_chat = self.chats[index]
