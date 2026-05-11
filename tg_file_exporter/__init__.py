@@ -78,7 +78,7 @@ def _links_to_html(entities: list, plain_text: str, html_text: str) -> str:
 
 def _wrap_message(message: Message) -> str:
     dt = message.date
-    formatted_date = f"%d.%m.%Y {dt.hour}:{dt.strftime('%M:%S')}" if dt else ""
+    formatted_date = f"{dt.strftime('%d.%m.%Y')} {dt.hour}:{dt.strftime('%M:%S')}" if dt else ""
     t = message.caption or message.text
     e = message.entities or message.caption_entities or []
     message_content = _links_to_html(e, t, t.html)  # type:ignore
