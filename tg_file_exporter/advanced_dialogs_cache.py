@@ -20,6 +20,7 @@ class AdvancedDialogsCache:
     ✅ Folders support
     ✅ Smart pagination (pinned never lost)
     ✅ No race-induced truncation
+    ✅ Flood-wait-safe rate limiting
     """
 
     def __init__(
@@ -38,6 +39,8 @@ class AdvancedDialogsCache:
 
         self._sync_started = False
         self._streamed = False
+        self._dialogs_lock = asyncio.Lock()
+        self._last_api_call: float = 0.0
 
     # ---------------- INIT ----------------
 
@@ -87,6 +90,7 @@ class AdvancedDialogsCache:
         - сначала кеш
         - потом Telegram
         - без дублей
+        - с защитой от Flood Wait
         """
 
         if not self._db:
@@ -116,6 +120,14 @@ class AdvancedDialogsCache:
         # -------- TELEGRAM STREAM --------
         if not self._streamed:
             self._streamed = True
+
+            # Rate limit: ensure minimum 2s gap between get_dialogs calls
+            async with self._dialogs_lock:
+                elapsed = time.time() - self._last_api_call
+                if elapsed < 2.0:
+                    logger.debug(f"rate limiting: waiting {2.0 - elapsed:.1f}s")
+                    await asyncio.sleep(2.0 - elapsed)
+
             logger.debug("load dialogs from Telegram")
             async for dialog in self.client.get_dialogs():
                 if (
@@ -133,12 +145,15 @@ class AdvancedDialogsCache:
 
                 yield dialog
 
-                asyncio.create_task(self._upsert_dialog(dialog))
+                self._last_api_call = time.time()
+                # Upsert to cache after yielding (not fire-and-forget)
+                await self._upsert_dialog(dialog)
 
-        # -------- BACKGROUND SYNC --------
+        # -------- BACKGROUND SYNC (delayed, only once) --------
         if not self._sync_started:
             self._sync_started = True
-            asyncio.create_task(self._background_sync())
+            # Delay background sync by 30s to avoid flood waits
+            asyncio.create_task(self._delayed_sync())
 
     # ---------------- REALTIME ----------------
 
@@ -239,8 +254,20 @@ class AdvancedDialogsCache:
 
     # ---------------- FULL SYNC ----------------
 
+    async def _delayed_sync(self):
+        """Run background sync after a delay to avoid flood waits."""
+        await asyncio.sleep(30.0)  # Wait 30 seconds before background refresh
+        await self._background_sync()
+
     async def _background_sync(self):
-        logger.debug("load dialogs from Telegram")
+        """Full resync with Telegram — rate-limited for safety."""
+        async with self._dialogs_lock:
+            elapsed = time.time() - self._last_api_call
+            if elapsed < 3.0:
+                logger.debug(f"background sync: waiting {3.0 - elapsed:.1f}s")
+                await asyncio.sleep(3.0 - elapsed)
+
+        logger.debug("background sync: loading dialogs from Telegram")
         async with self._write_lock:
             rows = []
             pinned_index = 0
@@ -269,6 +296,8 @@ class AdvancedDialogsCache:
 
                 if len(rows) >= self.batch_size:
                     await self._flush(rows)
+                    self._last_api_call = time.time()
+                    await asyncio.sleep(0.5)  # Small pause between batches
                     rows.clear()
 
             if rows:

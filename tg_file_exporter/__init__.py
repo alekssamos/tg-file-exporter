@@ -78,7 +78,9 @@ def _links_to_html(entities: list, plain_text: str, html_text: str) -> str:
 
 def _wrap_message(message: Message) -> str:
     dt = message.date
-    formatted_date = f"{dt.strftime('%d.%m.%Y')} {dt.hour}:{dt.strftime('%M:%S')}" if dt else ""
+    formatted_date = (
+        f"{dt.strftime('%d.%m.%Y')} {dt.hour}:{dt.strftime('%M:%S')}" if dt else ""
+    )
     t = message.caption or message.text
     e = message.entities or message.caption_entities or []
     message_content = _links_to_html(e, t, t.html)  # type:ignore
@@ -345,10 +347,9 @@ class ExportWizard(wx.Frame):
                 await self.start_export()
 
     @logger.catch
-    @logger.catch
     async def on_cancel(self, event):
         if self.close_running:
-            return False
+            return
         if (
             not self.completed_export
             and wx.MessageBox(
@@ -360,15 +361,44 @@ class ExportWizard(wx.Frame):
         ):
             return
         self.close_running = True
+        await self._shutdown()
+
+    async def _shutdown(self):
+        """Properly shut down all resources and exit the application."""
+        # Cancel export tasks
         if self.export_thread:
             self.export_thread.cancel()
-        if hasattr(self, "workers") and len(self.workers) > 0:
+        if hasattr(self, "workers"):
             for worker in self.workers:
                 worker.cancel()
-        event.Skip()
-        self.Close()
+
+        # Cancel chat loading thread
+        if (
+            len(self.steps) > 3
+            and hasattr(self.steps[3], "update_chats_thread")
+            and self.steps[3].update_chats_thread
+        ):
+            self.steps[3].update_chats_thread.cancel()
+
+        # Disconnect Telegram client
+        try:
+            await self.client.disconnect()
+        except Exception:
+            pass
+
+        # Close cache database
+        if len(self.steps) > 3 and hasattr(self.steps[3], "adc"):
+            try:
+                await self.steps[3].adc.close()
+            except Exception:
+                pass
+
+        # Destroy window and stop wx event loop
         self.Destroy()
-        raise SystemExit
+        try:
+            wx.GetApp().ExitMainLoop()
+        except Exception:
+            pass
 
     @logger.catch
     async def start_export(self):
@@ -767,9 +797,19 @@ class ChatSelectionStep(WizardStep):
         kc = event.GetKeyCode()
         if (kc >= 300 and kc <= 350) or kc in [9, 10, 27]:
             return
-        if self.update_chats_thread:
-            self.update_chats_thread.cancel()
-        self.update_chats_thread = StartCoroutine(self.load_chats(), self)
+        # Debounce: cancel previous debounce task and start a new one
+        if hasattr(self, "_debounce_task") and self._debounce_task:  # type:ignore
+            self._debounce_task.cancel()  # type:ignore
+        self._debounce_task = asyncio.ensure_future(self._debounced_load())
+        return
+
+    async def _debounced_load(self):
+        """Wait for typing to settle before reloading chats."""
+        try:
+            await asyncio.sleep(0.4)
+            self.update_chats_thread = StartCoroutine(self.load_chats(), self)
+        except asyncio.CancelledError:
+            pass
         return
         query = (self.search_input.GetValue() or "").strip()
         if query:
@@ -795,6 +835,8 @@ class ChatSelectionStep(WizardStep):
         index = self.folder_list.GetSelection()
         if index != wx.NOT_FOUND:
             self.selected_folder = self.folders[index]
+        if hasattr(self, "_debounce_task") and self._debounce_task:
+            self._debounce_task.cancel()
         if self.update_chats_thread:
             self.update_chats_thread.cancel()
         self.update_chats_thread = StartCoroutine(self.load_chats(), self)
