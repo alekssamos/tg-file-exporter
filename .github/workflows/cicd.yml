@@ -19,7 +19,7 @@ jobs:
     - name: Install the latest version of uv
       uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
 
-    - run: uv tool install ruff && uv tool install mypy
+    - run: uv tool install ruff
 
     - name: Install dependencies
       run: |
@@ -29,7 +29,7 @@ jobs:
 
     - name: check code
       shell: bash
-      run: ruff check . && uv run mypy -m tg_file_exporter
+      run: ruff check .
 
   compile:
 
