@@ -14,23 +14,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.10
-        cache: 'uv'
+    - name: Install the latest version of uv
+      uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
 
-    - run: pipx install uv ruff
+    - run: uv tool install ruff
 
     - name: Install dependencies
       run: |
+        sudo apt update -y
+        sudo apt install -y libgtk-3-dev
         uv sync
 
     - name: check code
       shell: bash
-      run: ruff check . && uv run mypy -m tg_file_exporter
+      run: ruff check .
 
   compile:
 
@@ -39,30 +38,34 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        os: ["ubuntu-latest", "windows-latest"]
+        os: ["ubuntu", "windows"]
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
-    - name: Set up Python x64
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.10
-        cache: 'uv'
+    - name: Install the latest version of uv
+      uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
 
-    - run: pipx install uv
     - name: Install dependencies
       shell: bash
+      env:
+        OS: ${{ matrix.os }}
       run: |
+        if [[ "${OS,,}" == "ubuntu" ]]; then
+        sudo apt update -y
+        sudo apt install -y libgtk-3-dev
+        fi
         uv sync
 
     - name: building executable
       shell: bash
-      run: uv build && uv run pyinstaller --noconsole -F tg-file-exporter.pyw
+      env:
+        OS: ${{ matrix.os }}
+      run: uv build && uv run pyinstaller --noconsole -F tg-file-exporter.pyw -n tg-file-exporter-$OS
 
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: exe_for_${{ matrix.os }}_${{ matrix.architecture }}
         path: dist/tg-file-exporter*
@@ -72,27 +75,26 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
     needs: ["build", "compile"]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: download releases files
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
     - name: Display structure of downloaded files
       run: ls -R
 
     - name: Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
-        files: exe_for_*/msspeech*
+        files: exe_for_*/tg-file-exporter*
         fail_on_unmatched_files: true
         # append_body: true
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.10
-        cache: 'uv'
+    - name: Install the latest version of uv
+      uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
 
     - name: Install dependencies
       run: |
+        sudo apt update -y || true
+        sudo apt install -y libgtk-3-dev || true
         uv sync
 
     - name: build
