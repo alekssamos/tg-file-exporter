@@ -14,8 +14,8 @@
   
   PyPI: `pip install uv` or `pipx install uv`
 
-2. Установите зависимости: `uv sync`
-3. Склонируйте репозиторий: `git clone https://github.com/alekssamos/tg-file-exporter/`
+2. Склонируйте репозиторий: `git clone https://github.com/alekssamos/tg-file-exporter/`
+3. Установите зависимости: `uv sync`
 4. Получите api_id и api_hash от [Telegram API](https://my.telegram.org/auth)
 5. Замените плейсхолдеры в `tg_file_exporter/__init__.py` на реальные значения.
 
@@ -35,9 +35,5 @@
 5. Выбор типов файлов b периода
 6. Непосредственно экспорт файлов
 
-## Todo
 
-Доделать поиск, сейчас он не работает. Пользуйтесь первой буквой в списке.
-
-
-Copyright 2025 @alekssamos
+Copyright 2025 - 2026 @alekssamos
