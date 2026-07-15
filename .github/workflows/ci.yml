@@ -99,11 +99,9 @@ jobs:
       run: |
         uv build
 
-    - name: Login to pypi
-      env:
-        UV_PUBLISH_USERNAME: __token__
-        UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-
     - name: Publish to pypi
       run: |
         uv publish
+      env:
+        UV_PUBLISH_USERNAME: __token__
+        UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_TOKEN }}
