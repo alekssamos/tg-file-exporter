@@ -5,13 +5,13 @@
 ## Установка
 
 1. Установите uv (если у вас его ещё нет)
-  
+
   Выберите один из способов
-  
+
   macOS, Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-  
+
   Windows: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
-  
+
   PyPI: `pip install uv` or `pipx install uv`
 
 2. Склонируйте репозиторий: `git clone https://github.com/alekssamos/tg-file-exporter/`
