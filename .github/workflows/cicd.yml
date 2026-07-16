@@ -74,6 +74,8 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
     needs: ["build", "compile"]
+    permissions:
+      contents: write
     steps:
     - uses: actions/checkout@v6
     - name: download releases files
