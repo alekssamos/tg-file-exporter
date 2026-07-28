@@ -1,24 +1,26 @@
-from pyrogram import Client
-from pyrogram import enums
-from pyrogram import errors
-from pyrogram.types import Chat, Message
-from pyrogram.errors import SessionPasswordNeeded
-from datetime import datetime
-from .search_messages_by_date import search_messages_by_date  # type:ignore
-from .advanced_dialogs_cache import AdvancedDialogsCache  # type:ignore
-from .search_text import search_chat
-from threading import Lock
+import asyncio
+import os
 import platform
-import subprocess
-from loguru import logger
+import sys
+from threading import Lock
+
+import aiofiles
 import wx  # type:ignore
 import wx.adv  # type:ignore
-import asyncio
-import tempfile
-import re
-from wxasync import AsyncBind, WxAsyncApp, StartCoroutine  # type:ignore
-import os
-import sys
+from loguru import logger
+from pyrogram import Client, enums, errors
+from pyrogram.types import Message
+from wxasync import AsyncBind, StartCoroutine, WxAsyncApp  # type:ignore
+
+from .auth_steps import AuthData, CodeStep, PasswordStep, PhoneStep
+from .base_wizard_step import WizardStep
+from .chat_selection_step import ChatSelectionStep  # type:ignore
+from .file_type_selection_step import FileTypeSelectionStep  # type:ignore
+from .get_chat_title import getChatTitle
+from .path_selection_step import PathSelectionStep  # type:ignore
+from .search_messages_by_date import search_messages_by_date  # type:ignore
+from .topic_selection_step import TopicSelectionStep  # type:ignore
+from .wx_to_py_date import WxToPyDate  # type:ignore
 
 MAX_WORKERS = 4
 NEXT_BUTTON_LABEL = "&Далее>"
@@ -69,7 +71,7 @@ def _links_to_html(entities: list, plain_text: str, html_text: str) -> str:
             prefix = "http://"
         content = content.replace(
             url,
-            '<a href="{prefix_url}">{url}</a>'.format(prefix_url=prefix + url, url=url),
+            f'<a href="{prefix + url}">{url}</a>',
             1,
         )
         replaced.add(url)
@@ -92,37 +94,6 @@ def _wrap_message(message: Message) -> str:
     """
 
 
-def save_path(path=""):
-    _filename = os.path.join(tempfile.gettempdir(), "tg_file_exporter_selected_dir")
-    if path:
-        with open(_filename, "w", encoding="UTF-8") as f:
-            f.write(path)
-    if os.path.isfile(_filename) and os.path.getsize(_filename) > 0:
-        with open(_filename, "r", encoding="UTF-8") as f:
-            return f.read(1024).strip()
-    return ""
-
-
-def WxToPyDate(date: wx._core.DateTime, is_end: bool = False) -> datetime:
-    hour: int = 0
-    minute: int = 0
-    second: int = 0
-    if is_end:
-        hour = 23
-        minute = 59
-        second = 59
-    logger.debug(f"wx date is {date}")
-    # Undocumented: wx DateTime returns Month from 0, not from 1
-    return datetime(
-        date.GetYear(), date.GetMonth() + 1, date.GetDay(), hour, minute, second
-    )
-
-
-def _getChatTitle(chat: Chat) -> str:
-    name: str = chat.title or (chat.first_name or "") + " " + (chat.last_name or "")
-    return name.strip() or "deleted?"
-
-
 class TGFileExporter(WxAsyncApp):
     def __init__(self):
         super().__init__(sleep_duration=0.000001)
@@ -143,12 +114,6 @@ class TGFileExporter(WxAsyncApp):
         self.wizard = ExportWizard(None, title="TG File Exporter", client=self.client)
         self.wizard.Show()
         return True
-
-
-class AuthData:
-    def __init__(self, phone, sent_code):
-        self.phone = phone
-        self.sent_code = sent_code
 
 
 class ExportWizard(wx.Frame):
@@ -383,21 +348,18 @@ class ExportWizard(wx.Frame):
         # Disconnect Telegram client
         try:
             await self.client.disconnect()
-        except Exception:
+        except ConnectionError:
             pass
 
         # Close cache database
         if len(self.steps) > 3 and hasattr(self.steps[3], "adc"):
-            try:
-                await self.steps[3].adc.close()
-            except Exception:
-                pass
+            await self.steps[3].adc.close()
 
         # Destroy window and stop wx event loop
         self.Destroy()
         try:
             wx.GetApp().ExitMainLoop()
-        except Exception:
+        except RuntimeError:
             pass
 
     @logger.catch
@@ -454,12 +416,12 @@ class ExportWizard(wx.Frame):
 
         await self.q.join()
         if self.only_links:
-            with open(
+            async with aiofiles.open(
                 os.path.join(path, "links_" + str(chat.chat.id) + ".html"),
                 "w",
                 encoding="UTF-8",
             ) as fpl:
-                fpl.write(
+                await fpl.write(
                     """
 <!DOCTYPE html>
 <html>
@@ -481,7 +443,7 @@ class ExportWizard(wx.Frame):
 </body>
 </html>
                 """.format(
-                        chat_title=_getChatTitle(chat.chat),
+                        chat_title=getChatTitle(chat.chat),
                         links="\n".join(self.messages_with_links),
                     )
                 )
@@ -500,7 +462,7 @@ class ExportWizard(wx.Frame):
             wx.OK | wx.ICON_INFORMATION,
         )
         if platform.platform().startswith("Win"):
-            subprocess.call(["explorer.exe", path])
+            await asyncio.create_subprocess_exec(["explorer.exe", path])  # type:ignore
 
     @logger.catch
     async def download_media_worker(self):
@@ -556,467 +518,13 @@ class ExportWizard(wx.Frame):
                     self.errors_count += 1
                 wx.CallAfter(
                     self.steps[-1].update_progress,
-                    f"Ошибка #{self.errors_count}: {str(e)}",
+                    f"Ошибка #{self.errors_count}: {e!s}",
                 )
             finally:
                 try:
                     self.q.task_done()
                 except ValueError:
                     pass
-
-
-# Базовый класс для шагов
-class WizardStep(wx.Panel):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.step_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.SetSizer(self.step_sizer)
-
-    def can_proceed(self):
-        return True
-
-
-# Шаг 1: Номер телефона
-class PhoneStep(WizardStep):
-    def __init__(self, parent, client, auth_data):
-        super().__init__(parent)
-        logger.debug("PhoneStep")
-        self.client = client
-        self.auth_data = auth_data
-
-        self.step_sizer.Add(wx.StaticText(self, label="Номер телефона:"), 0, wx.ALL, 5)
-
-        self.phone_input = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
-        self.phone_input.SetMaxLength(20)
-
-        # self.phone_input.Bind(wx.EVT_TEXT_ENTER, self.on_send_code)
-
-        self.step_sizer.Add(self.phone_input, 0, wx.EXPAND | wx.ALL, 5)
-
-    @logger.catch
-    async def on_send_code(self, event):
-        logger.info("Going to send the code...")
-        phone = re.sub(r"\D+", "", (self.phone_input.GetValue() or ""))
-        logger.debug("phone: " + phone)
-        if phone and len(phone) > 10:
-            try:
-                logger.info("sending code...")
-                self.auth_data.phone = "+" + phone
-                self.auth_data.sent_code = await self.client.send_code(
-                    self.auth_data.phone
-                )
-                # wx.MessageBox(
-                # "Код отправлен на ваш телефон.",
-                # "Информация",
-                # wx.OK | wx.ICON_INFORMATION,
-                # )
-            except Exception as e:
-                logger.exception("error in sending code")
-                wx.MessageBox(
-                    f"Ошибка отправки кода: {str(e)}", "Ошибка", wx.OK | wx.ICON_ERROR
-                )
-
-    def can_proceed(self):
-        return self.auth_data.sent_code is not None
-
-
-# Шаг 2: Код
-class CodeStep(WizardStep):
-    def __init__(self, parent, client, auth_data):
-        super().__init__(parent)
-        logger.debug("CodeStep")
-        self.client = client
-        self.code_entered = False
-        self.password_needed = False
-        self.auth_data = auth_data
-
-        self.step_sizer.Add(wx.StaticText(self, label="Код из SMS:"), 0, wx.ALL, 5)
-
-        self.code_input = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
-        self.code_input.SetMaxLength(6)
-
-        self.step_sizer.Add(self.code_input, 0, wx.EXPAND | wx.ALL, 5)
-
-    @logger.catch
-    async def on_sign_in(self, event):
-        code = self.code_input.GetValue() or ""
-        if code:
-            try:
-                logger.info("trying sign in")
-                await self.client.sign_in(
-                    self.auth_data.phone, self.auth_data.sent_code.phone_code_hash, code
-                )
-                self.code_entered = True
-                logger.info("authorized successfully")
-            except SessionPasswordNeeded:
-                self.code_entered = True
-                self.password_needed = True
-                logger.info("needed password")
-            except Exception as e:
-                logger.exception("error sign in")
-                wx.MessageBox(
-                    f"Ошибка входа: {str(e)}", "Ошибка", wx.OK | wx.ICON_ERROR
-                )
-
-    def can_proceed(self):
-        return self.code_entered
-
-
-# Шаг 3: Пароль
-class PasswordStep(WizardStep):
-    def __init__(self, parent, client):
-        super().__init__(parent)
-        logger.debug("PasswordStep")
-        self.client = client
-        self.password_entered = False
-
-        self.step_sizer.Add(wx.StaticText(self, label="Пароль:"), 0, wx.ALL, 5)
-
-        self.password_input = wx.TextCtrl(
-            self, style=wx.TE_PASSWORD | wx.TE_PROCESS_ENTER
-        )
-        self.password_input.SetMaxLength(100)
-
-        self.step_sizer.Add(self.password_input, 0, wx.EXPAND | wx.ALL, 5)
-        self.password_hint_label = wx.StaticText(self, label="Подсказка")
-        self.password_hint_label.SetCanFocus(True)
-        self.step_sizer.Add(self.password_hint_label, 0, wx.EXPAND | wx.ALL, 5)
-
-    @logger.catch
-    async def set_password_hint(self):
-        password_hint = (await self.client.get_password_hint()) or ""
-        self.password_hint_label.SetLabelText("Подсказка: " + password_hint)
-
-    @logger.catch
-    async def on_submit(self, event):
-        password = self.password_input.GetValue()
-        try:
-            logger.info("trying password auth")
-            await self.client.check_password(password)
-            self.password_entered = True
-        except Exception as e:
-            logger.exception("error password")
-            wx.MessageBox(f"Ошибка пароля: {str(e)}", "Ошибка", wx.OK | wx.ICON_ERROR)
-
-    def can_proceed(self):
-        return self.password_entered
-
-
-# Шаг 3: Выбор чата
-class ChatSelectionStep(WizardStep):
-    def __init__(self, parent, client):
-        super().__init__(parent)
-        logger.debug("ChatSelectionStep")
-        self.client = client
-        self.folders = [
-            None,
-        ]
-        self._folders = []
-        self.selected_folder = None
-        self.chats = []
-        self.selected_chat = None
-        self.update_chats_thread = None
-        if not hasattr(self, "adc"):
-            self.adc = AdvancedDialogsCache(self.client)
-
-        self.folder_list = wx.ListBox(self)
-        self.folder_list.Disable()
-        self.folder_list.Hide()
-        self.chat_list = wx.ListBox(self)
-        self.search_input = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
-        # self.search_input.Disable()
-        # self.search_button = wx.Button(self, label="Поиск")
-        # self.search_button.Disable()
-
-        AsyncBind(wx.EVT_KEY_UP, self.on_search, self.search_input)
-        # AsyncBind(wx.EVT_BUTTON, self.on_search, self.search_button)
-        self.folder_list.Bind(wx.EVT_LISTBOX, self.on_folder_select)
-        self.chat_list.Bind(wx.EVT_LISTBOX, self.on_chat_select)
-
-        self.step_sizer.Add(self.folder_list, 1, wx.EXPAND | wx.ALL, 5)
-        self.step_sizer.Add(wx.StaticText(self, label="Выберите чат:"), 0, wx.ALL, 5)
-        self.step_sizer.Add(self.search_input, 0, wx.EXPAND | wx.ALL, 5)
-        # self.step_sizer.Add(self.search_button, 0, wx.ALL, 5)
-        self.step_sizer.Add(self.chat_list, 1, wx.EXPAND | wx.ALL, 5)
-        self.folder_list.Append("Все чаты")
-        self.folder_list.SetSelection(0)
-
-    @logger.catch
-    async def load_chats(self):
-        try:
-            if not self._folders:
-                self._folders = await self.client.get_folders()
-            for folder in self._folders:
-                self.folders.append(folder)
-                wx.CallAfter(
-                    self.folder_list.Append,
-                    folder.name,
-                )
-            self.chat_list.Clear()
-            self.chats = []
-            folder_id = self.selected_folder.id if self.selected_folder else None
-            async for dialog in self.adc.iter_dialogs(folder_id):
-                tm = ""
-                if dialog.top_message:
-                    tm = dialog.top_message.text or dialog.top_message.caption or ""
-                chatline = f"{_getChatTitle(dialog.chat)} ({tm})"
-                if (
-                    self.search_input.GetValue()
-                    and self.search_input.GetValue().strip()
-                ):
-                    if not search_chat(
-                        _getChatTitle(dialog.chat), self.search_input.GetValue().strip()
-                    ):
-                        continue
-                self.chats.append(dialog)
-                wx.CallAfter(
-                    self.chat_list.Append,
-                    chatline,
-                )
-        except Exception as e:
-            logger.exception("error in update dialogs")
-            wx.CallAfter(
-                wx.MessageBox,
-                f"Ошибка загрузки чатов: {str(e)}",
-                "Ошибка",
-                wx.OK | wx.ICON_ERROR,
-            )
-
-    def update_chat_list(self, chats):
-        self.update_chats_thread.cancel()  # type:ignore
-        self.chat_list.Clear()
-        for chat in chats:
-            tm = ""
-            if chat.top_message:
-                tm = chat.top_message.text or chat.top_message.caption or ""
-            self.chat_list.Append(f"{_getChatTitle(chat.chat)} ({tm})")
-
-    @logger.catch
-    async def on_search(self, event):
-        event.Skip()
-        kc = event.GetKeyCode()
-        if (kc >= 300 and kc <= 350) or kc in [9, 10, 27]:
-            return
-        # Debounce: cancel previous debounce task and start a new one
-        if hasattr(self, "_debounce_task") and self._debounce_task:  # type:ignore
-            self._debounce_task.cancel()  # type:ignore
-        self._debounce_task = asyncio.ensure_future(self._debounced_load())
-        return
-
-    async def _debounced_load(self):
-        """Wait for typing to settle before reloading chats."""
-        try:
-            await asyncio.sleep(0.4)
-            self.update_chats_thread = StartCoroutine(self.load_chats(), self)
-        except asyncio.CancelledError:
-            pass
-        return
-        query = (self.search_input.GetValue() or "").strip()
-        if query:
-            try:
-                # Использовать search_global для поиска
-                results: list[Message] = []
-                async for result in self.client.search_global(query, limit=30):
-                    results.append(result)
-                wx.CallAfter(self.update_chat_list, results)
-            except Exception as e:
-                logger.exception("error in search")
-                wx.CallAfter(
-                    wx.MessageBox,
-                    f"Ошибка поиска: {str(e)}",
-                    "Ошибка",
-                    wx.OK | wx.ICON_ERROR,
-                )
-        else:
-            wx.CallAfter(self.update_chat_list, self.chats)
-
-    def on_folder_select(self, event):
-        event.Skip()
-        index = self.folder_list.GetSelection()
-        if index != wx.NOT_FOUND:
-            self.selected_folder = self.folders[index]
-        if hasattr(self, "_debounce_task") and self._debounce_task:
-            self._debounce_task.cancel()
-        if self.update_chats_thread:
-            self.update_chats_thread.cancel()
-        self.update_chats_thread = StartCoroutine(self.load_chats(), self)
-
-    def on_chat_select(self, event):
-        event.Skip()
-        index = self.chat_list.GetSelection()
-        if index != wx.NOT_FOUND:
-            self.selected_chat = self.chats[index]
-
-    def can_proceed(self):
-        return self.selected_chat is not None
-
-
-# Шаг 4: Выбор темы
-class TopicSelectionStep(WizardStep):
-    def __init__(self, parent, client):
-        super().__init__(parent)
-        self.client = client
-        self.selected_topic = None
-        self.has_topics = False
-
-        self.topic_list = wx.ListBox(self)
-        self.topic_list.Bind(wx.EVT_LISTBOX, self.on_topic_select)
-
-        self.step_sizer.Add(
-            wx.StaticText(self, label="Выберите тему (или 'Все'):"), 0, wx.ALL, 5
-        )
-        self.step_sizer.Add(self.topic_list, 1, wx.EXPAND | wx.ALL, 5)
-
-    @logger.catch
-    async def set_chat(self, chat):
-        self.chat = chat
-
-    @logger.catch
-    async def load_topics(self, p):
-        try:
-            # Проверить, есть ли темы в чате
-            topics = []
-            if self.chat.chat.is_forum:
-                async for topic in self.client.get_forum_topics(self.chat.chat.id):
-                    topics.append(topic)
-            self.topics = topics
-            if topics:
-                self.has_topics = True
-                self.topic_list.Clear()
-                self.topic_list.Append("Все")
-                for topic in topics:
-                    self.topic_list.Append(topic.title)
-                self.topic_list.SetSelection(0)  # Выбрать "Все" по умолчанию
-                self.selected_topic = None  # None значит все
-            else:
-                self.has_topics = False
-                self.topic_list.Clear()
-                self.topic_list.Append("Чат без тем")
-                self.topic_list.SetSelection(0)
-                self.selected_topic = None
-                await p.on_next(None)
-        except Exception as e:
-            logger.exception("error in get topics")
-            self.has_topics = False
-            wx.MessageBox(
-                f"Ошибка загрузки тем из {_getChatTitle(self.chat.chat)}: {str(e)}",
-                "Ошибка",
-                wx.OK | wx.ICON_ERROR,
-            )
-
-    @logger.catch
-    def on_topic_select(self, event):
-        index = self.topic_list.GetSelection()
-        if index == 0:
-            self.selected_topic = None  # Все
-        else:
-            self.selected_topic = self.topics[index - 1].id  # id темы
-
-    def can_proceed(self):
-        return True  # Всегда можно перейти, даже без выбора
-
-
-# Шаг 5: Путь сохранения
-class PathSelectionStep(WizardStep):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.step_sizer.Add(wx.StaticText(self, label="Путь сохранения:"), 0, wx.ALL, 5)
-        self.path_input = wx.TextCtrl(self)
-        self.path_input.SetMaxLength(1024)
-        self.path_input.SetValue(save_path())
-        self.browse_button = wx.Button(self, label="Обзор")
-
-        self.browse_button.Bind(wx.EVT_BUTTON, self.on_browse)
-
-        h_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        h_sizer.Add(self.path_input, 1, wx.EXPAND | wx.ALL, 5)
-        h_sizer.Add(self.browse_button, 0, wx.ALL, 5)
-
-        self.step_sizer.Add(h_sizer, 0, wx.EXPAND)
-
-    def can_proceed(self):
-        path = self.path_input.GetValue().strip()
-        try:
-            if len(path) > 0:
-                os.makedirs(path, exist_ok=True)
-        except (ValueError, OSError, FileExistsError, RuntimeError):
-            logger.exception("error create export dir")
-            return False
-        if len(path) == 0 or not os.path.isdir(path):
-            wx.MessageBox(
-                "Укажите корректный путь к папке для скачивания в неё файлов",
-                "Ошибка",
-                wx.OK | wx.ICON_ERROR,
-            )
-            self.browse_button.SetFocus()
-            return False
-        save_path(path)
-        return True
-
-    def on_browse(self, event):
-        dialog = wx.DirDialog(self, "Выберите папку для сохранения")
-        if dialog.ShowModal() == wx.ID_OK:
-            self.path_input.SetValue(dialog.GetPath())
-        dialog.Destroy()
-
-
-# Шаг 6: Типы файлов b период
-class FileTypeSelectionStep(WizardStep):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.filters_choices = (
-            ("Музыка", enums.MessagesFilter.AUDIO),
-            ("Фото", enums.MessagesFilter.PHOTO),
-            ("Видео", enums.MessagesFilter.VIDEO),
-            ("Фото и видео", enums.MessagesFilter.PHOTO_VIDEO),
-            ("Файлы", enums.MessagesFilter.DOCUMENT),
-            ("Голосовые", enums.MessagesFilter.AUDIO_VIDEO_NOTE),
-            ("Ссылки", enums.MessagesFilter.URL),
-        )
-        self.choice_file_type = wx.Choice(
-            self, choices=[c[0] for c in self.filters_choices]
-        )
-        self.choice_file_type.SetSelection(0)
-
-        self.step_sizer.Add(
-            wx.StaticText(self, label="Выберите типы файлов:"), 0, wx.ALL, 5
-        )
-        self.step_sizer.Add(self.choice_file_type, 0, wx.ALL, 5)
-        h_sizer_2 = wx.BoxSizer(wx.HORIZONTAL)
-        self.checkbox_period = wx.CheckBox(self, label="За период")
-        self.checkbox_period.Bind(wx.EVT_CHECKBOX, self.on_check_period)
-        self.start_date = wx.adv.DatePickerCtrl(self, wx.ID_ANY)
-        self.start_date.Disable()
-        self.end_date = wx.adv.DatePickerCtrl(self, wx.ID_ANY)
-        self.end_date.Disable()
-        h_sizer_2.Add(self.checkbox_period, 0, wx.ALL, 5)
-        h_sizer_2.Add(self.start_date, 0, wx.ALL, 5)
-        h_sizer_2.Add(self.end_date, 0, wx.ALL, 5)
-        self.step_sizer.Add(wx.StaticText(self, label="Фильтр по дате:"), 0, wx.ALL, 5)
-        self.step_sizer.Add(h_sizer_2, 0, wx.EXPAND)
-
-    def can_proceed(self):
-        start_date = WxToPyDate(self.start_date.GetValue())
-        end_date = WxToPyDate(self.end_date.GetValue(), True)
-        if start_date > end_date and self.checkbox_period.IsChecked():
-            wx.MessageBox(
-                "Дата начала не может быть из будущего",
-                "Ошибка",
-                wx.OK | wx.ICON_ERROR,
-            )
-            self.start_date.SetFocus()
-            return False
-
-        return True
-
-    def on_check_period(self, event):
-        event.Skip()
-        datepickers = [self.start_date, self.end_date]
-        for dp in datepickers:
-            if self.checkbox_period.IsChecked():
-                dp.Enable()
-            else:
-                dp.Disable()
 
 
 # Шаг 7: Экспорт

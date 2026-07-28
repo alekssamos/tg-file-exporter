@@ -52,9 +52,7 @@ def search_chat(text: str, substr: str) -> bool:
     substr = normalize(substr)
 
     # быстрый путь
-    if substr in text:
-        return True
-    return False  # ... Not necessary yet
+    return substr in text
 
     # ограниченный Левенштейн
     def is_close(a: str, b: str, max_dist: int) -> bool:

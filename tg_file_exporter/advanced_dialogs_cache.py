@@ -1,11 +1,13 @@
 # type:ignore
+from __future__ import annotations
+
 import asyncio
 import pickle
 import time
-from typing import AsyncIterator, Optional, Set
+from collections.abc import AsyncIterator
 
-from loguru import logger
 import aiosqlite
+from loguru import logger
 from pyrogram import Client, filters
 from pyrogram.handlers import MessageHandler
 
@@ -33,7 +35,7 @@ class AdvancedDialogsCache:
         self.db_path = db_path
         self.batch_size = batch_size
 
-        self._db: Optional[aiosqlite.Connection] = None
+        self._db: aiosqlite.Connection | None = None
         self._write_lock = asyncio.Lock()
         self._queue = asyncio.Queue()
 
@@ -84,7 +86,7 @@ class AdvancedDialogsCache:
 
     # ---------------- PUBLIC API ----------------
 
-    async def iter_dialogs(self, folder_id: Optional[int] = None) -> AsyncIterator:
+    async def iter_dialogs(self, folder_id: int | None = None) -> AsyncIterator:
         """
         Главный streaming API:
         - сначала кеш
@@ -96,21 +98,21 @@ class AdvancedDialogsCache:
         if not self._db:
             await self.init()
 
-        yielded: Set[int] = set()
+        yielded: set[int] = set()
 
         # -------- CACHE --------
         w = "WHERE folder_id = ?" if folder_id is not None else ""
-        binds = (folder_id,) if folder_id is not None else tuple()
+        binds = (folder_id,) if folder_id is not None else ()
         logger.debug("load dialogs from db")
         async with self._db.execute(
-            """
+            f"""
             SELECT chat_id, raw FROM dialogs
             {w}
             ORDER BY
                 is_pinned DESC,
                 pinned_order ASC,
                 date DESC
-        """.format(w=w),
+        """,
             binds,
         ) as cursor:
             async for chat_id, raw in cursor:
