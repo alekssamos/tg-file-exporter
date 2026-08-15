@@ -6,6 +6,7 @@ authors = [{ name = "Alexey", email = "aleks-samos@yandex.ru" }]
 readme = "README.md"
 requires-python = ">=3.10.0,<3.12"
 dependencies = [
+    "aiofiles>=25.1.0",
     "aiosqlite>=0.22.1",
     "kurigram",
     "loguru>=0.7.3",
