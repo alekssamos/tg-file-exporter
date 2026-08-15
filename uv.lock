@@ -1,10 +1,9 @@
 version = 1
 revision = 3
-requires-python = ">=3.9.0, <3.12"
+requires-python = ">=3.10.0, <3.12"
 resolution-markers = [
     "python_full_version >= '3.11'",
-    "python_full_version == '3.10.*'",
-    "python_full_version < '3.10'",
+    "python_full_version < '3.11'",
 ]
 
 [[package]]
@@ -32,18 +31,6 @@ source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }
 sdist = { url = "https://pypi-mirror.gitverse.ru/packages/colorama/0.4.6/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44" }
 wheels = [
     { url = "https://pypi-mirror.gitverse.ru/packages/colorama/0.4.6/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6" },
-]
-
-[[package]]
-name = "importlib-metadata"
-version = "8.7.1"
-source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }
-dependencies = [
-    { name = "zipp" },
-]
-sdist = { url = "https://pypi-mirror.gitverse.ru/packages/importlib-metadata/8.7.1/importlib_metadata-8.7.1.tar.gz", hash = "sha256:49fef1ae6440c182052f407c8d34a68f72efc36db9ca90dc0113398f2fdde8bb" }
-wheels = [
-    { url = "https://pypi-mirror.gitverse.ru/packages/importlib-metadata/8.7.1/importlib_metadata-8.7.1-py3-none-any.whl", hash = "sha256:5a1f80bf1daa489495071efbb095d75a634cf28a8bc299581244063b53176151" },
 ]
 
 [[package]]
@@ -86,55 +73,10 @@ wheels = [
 
 [[package]]
 name = "numpy"
-version = "2.0.2"
-source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }
-resolution-markers = [
-    "python_full_version < '3.10'",
-]
-sdist = { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2.tar.gz", hash = "sha256:883c987dee1880e2a864ab0dc9892292582510604156762362d9326444636e78" }
-wheels = [
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:51129a29dbe56f9ca83438b706e2e69a39892b5eda6cedcb6b0c9fdc9b0d3ece" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:f15975dfec0cf2239224d80e32c3170b1d168335eaedee69da84fbe9f1f9cd04" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:8c5713284ce4e282544c68d1c3b2c7161d38c256d2eefc93c1d683cf47683e66" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp310-cp310-macosx_14_0_x86_64.whl", hash = "sha256:becfae3ddd30736fe1889a37f1f580e245ba79a5855bff5f2a29cb3ccc22dd7b" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:2da5960c3cf0df7eafefd806d4e612c5e19358de82cb3c343631188991566ccd" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:496f71341824ed9f3d2fd36cf3ac57ae2e0165c143b55c3a035ee219413f3318" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:a61ec659f68ae254e4d237816e33171497e978140353c0c2038d46e63282d0c8" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:d731a1c6116ba289c1e9ee714b08a8ff882944d4ad631fd411106a30f083c326" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp310-cp310-win32.whl", hash = "sha256:984d96121c9f9616cd33fbd0618b7f08e0cfc9600a7ee1d6fd9b239186d19d97" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp310-cp310-win_amd64.whl", hash = "sha256:c7b0be4ef08607dd04da4092faee0b86607f111d5ae68036f16cc787e250a131" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:49ca4decb342d66018b01932139c0961a8f9ddc7589611158cb3c27cbcf76448" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:11a76c372d1d37437857280aa142086476136a8c0f373b2e648ab2c8f18fb195" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:807ec44583fd708a21d4a11d94aedf2f4f3c3719035c76a2bbe1fe8e217bdc57" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp311-cp311-macosx_14_0_x86_64.whl", hash = "sha256:8cafab480740e22f8d833acefed5cc87ce276f4ece12fdaa2e8903db2f82897a" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a15f476a45e6e5a3a79d8a14e62161d27ad897381fecfa4a09ed5322f2085669" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:13e689d772146140a252c3a28501da66dfecd77490b498b168b501835041f951" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:9ea91dfb7c3d1c56a0e55657c0afb38cf1eeae4544c208dc465c3c9f3a7c09f9" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:c1c9307701fec8f3f7a1e6711f9089c06e6284b3afbbcd259f7791282d660a15" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp311-cp311-win32.whl", hash = "sha256:a392a68bd329eafac5817e5aefeb39038c48b671afd242710b451e76090e81f4" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp311-cp311-win_amd64.whl", hash = "sha256:286cd40ce2b7d652a6f22efdfc6d1edf879440e53e76a75955bc0c826c7e64dc" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:9059e10581ce4093f735ed23f3b9d283b9d517ff46009ddd485f1747eb22653c" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:423e89b23490805d2a5a96fe40ec507407b8ee786d66f7328be214f9679df6dd" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp39-cp39-macosx_14_0_arm64.whl", hash = "sha256:2b2955fa6f11907cf7a70dab0d0755159bca87755e831e47932367fc8f2f2d0b" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp39-cp39-macosx_14_0_x86_64.whl", hash = "sha256:97032a27bd9d8988b9a97a8c4d2c9f2c15a81f61e2f21404d7e8ef00cb5be729" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:1e795a8be3ddbac43274f18588329c72939870a16cae810c2b73461c40718ab1" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f26b258c385842546006213344c50655ff1555a9338e2e5e02a0756dc3e803dd" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:5fec9451a7789926bcf7c2b8d187292c9f93ea30284802a0ab3f5be8ab36865d" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp39-cp39-musllinux_1_2_aarch64.whl", hash = "sha256:9189427407d88ff25ecf8f12469d4d39d35bee1db5d39fc5c168c6f088a6956d" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp39-cp39-win32.whl", hash = "sha256:905d16e0c60200656500c95b6b8dca5d109e23cb24abc701d41c02d74c6b3afa" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-cp39-cp39-win_amd64.whl", hash = "sha256:a3f4ab0caa7f053f6797fcd4e1e25caee367db3112ef2b6ef82d749530768c73" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-pp39-pypy39_pp73-macosx_10_9_x86_64.whl", hash = "sha256:7f0a0c6f12e07fa94133c8a67404322845220c06a9e80e85999afe727f7438b8" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-pp39-pypy39_pp73-macosx_14_0_x86_64.whl", hash = "sha256:312950fdd060354350ed123c0e25a71327d3711584beaef30cdaa93320c392d4" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:26df23238872200f63518dd2aa984cfca675d82469535dc7162dc2ee52d9dd5c" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.0.2/numpy-2.0.2-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:a46288ec55ebbd58947d31d72be2c63cbf839f0a63b49cb755022310792a3385" },
-]
-
-[[package]]
-name = "numpy"
 version = "2.2.6"
 source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }
 resolution-markers = [
-    "python_full_version == '3.10.*'",
+    "python_full_version < '3.11'",
 ]
 sdist = { url = "https://pypi-mirror.gitverse.ru/packages/numpy/2.2.6/numpy-2.2.6.tar.gz", hash = "sha256:e29554e2bef54a90aa5cc07da6ce955accb83f21ab5de01a62c8478897b264fd" }
 wheels = [
@@ -223,7 +165,6 @@ version = "6.19.0"
 source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }
 dependencies = [
     { name = "altgraph" },
-    { name = "importlib-metadata", marker = "python_full_version < '3.10'" },
     { name = "macholib", marker = "sys_platform == 'darwin'" },
     { name = "packaging" },
     { name = "pefile", marker = "sys_platform == 'win32'" },
@@ -251,7 +192,6 @@ name = "pyinstaller-hooks-contrib"
 version = "2026.3"
 source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }
 dependencies = [
-    { name = "importlib-metadata", marker = "python_full_version < '3.10'" },
     { name = "packaging" },
     { name = "setuptools" },
 ]
@@ -289,7 +229,7 @@ wheels = [
 
 [[package]]
 name = "tg-file-exporter"
-version = "1.1.23"
+version = "1.1.24"
 source = { virtual = "." }
 dependencies = [
     { name = "aiosqlite" },
@@ -342,19 +282,6 @@ wheels = [
     { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:9d9f13586065a6d86d05c16409054033a84be208acee29b49f6f194e27b08642" },
     { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-cp311-cp311-win32.whl", hash = "sha256:10dd3870aecb1a783c6eafd3b164b2149dbc93a9ee13feb7e6f5c58f87c24cd0" },
     { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-cp311-cp311-win_amd64.whl", hash = "sha256:a1beec47d6af8b509af7cf266e30f7703208076076594714005b42d2c25225b3" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:7885a75db09ce8bdba42d2c332085bfe314f232541a729808c7507ffa261ff9a" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:0d28aa317364a5c27317fe97a48267aa1c65c9aaf589909e97489ebe82a714e3" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:940974e19044dc65bcf7b9c5255173b896dff010142f3833047dc55d59cde21c" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:457c657dd10ffb4bbbb007132a0f6a7bee5080176a98c51f285fedf636b624cb" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-cp39-cp39-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:539bdc6b9239fb6a6b134591a998dc7f50d4dcc4fed861f80540682acc0c3802" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-cp39-cp39-musllinux_1_1_i686.whl", hash = "sha256:4d70d5517d64ca952896b726d22c8a66594e6f6259ee2cb4fa134c02d0e8c3e0" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:90b6337d3ae4348ed14f89dd2ebf7011fa63d67a48c8a98d955a1e392176c60a" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-cp39-cp39-win32.whl", hash = "sha256:37c4b9be82716fbc6d2b123caef448eee28683888803db075d842327766f7624" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-cp39-cp39-win_amd64.whl", hash = "sha256:6e96b3a478fae977228c5750194c20a18cde402bbbea6593de424f84d4a8893b" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-pp39-pypy39_pp73-macosx_10_9_x86_64.whl", hash = "sha256:9b0a088ff2e05b6bbe891da936f62b99bd85202b2b9f4f57f71a408490dd518c" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f245895c7d518342089d15b5dca3cee9ffa5a0f3534db9d5a930f6a27dff4adf" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-pp39-pypy39_pp73-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:7dbf607d645c39a577a0f8571039d11ddd2dcdf9656465be75f9e0f540472444" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/tgcrypto/1.2.5/TgCrypto-1.2.5-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:d6b0c2dc84e632ce7b3d0b767cfe20967e557ad7d71ea5dbd7df2dd544323181" },
 ]
 
 [[package]]
@@ -368,24 +295,8 @@ wheels = [
 
 [[package]]
 name = "webcolors"
-version = "24.11.1"
-source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }
-resolution-markers = [
-    "python_full_version < '3.10'",
-]
-sdist = { url = "https://pypi-mirror.gitverse.ru/packages/webcolors/24.11.1/webcolors-24.11.1.tar.gz", hash = "sha256:ecb3d768f32202af770477b8b65f318fa4f566c22948673a977b00d589dd80f6" }
-wheels = [
-    { url = "https://pypi-mirror.gitverse.ru/packages/webcolors/24.11.1/webcolors-24.11.1-py3-none-any.whl", hash = "sha256:515291393b4cdf0eb19c155749a096f779f7d909f7cceea072791cb9095b92e9" },
-]
-
-[[package]]
-name = "webcolors"
 version = "25.10.0"
 source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version == '3.10.*'",
-]
 sdist = { url = "https://pypi-mirror.gitverse.ru/packages/webcolors/25.10.0/webcolors-25.10.0.tar.gz", hash = "sha256:62abae86504f66d0f6364c2a8520de4a0c47b80c03fc3a5f1815fedbef7c19bf" }
 wheels = [
     { url = "https://pypi-mirror.gitverse.ru/packages/webcolors/25.10.0/webcolors-25.10.0-py3-none-any.whl", hash = "sha256:032c727334856fc0b968f63daa252a1ac93d33db2f5267756623c210e57a4f1d" },
@@ -405,8 +316,7 @@ name = "wxasync"
 version = "0.49"
 source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }
 dependencies = [
-    { name = "wxpython", version = "4.2.4", source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }, marker = "python_full_version < '3.10'" },
-    { name = "wxpython", version = "4.2.5", source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }, marker = "python_full_version >= '3.10'" },
+    { name = "wxpython" },
 ]
 sdist = { url = "https://pypi-mirror.gitverse.ru/packages/wxasync/0.49/wxasync-0.49.tar.gz", hash = "sha256:8c05dcdc165cc71e8d2aece4ee8ed20019fafff05d2657d50b6b7bfb1fe10091" }
 wheels = [
@@ -415,40 +325,8 @@ wheels = [
 
 [[package]]
 name = "wxpython"
-version = "4.2.4"
-source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }
-resolution-markers = [
-    "python_full_version < '3.10'",
-]
-dependencies = [
-    { name = "numpy", version = "2.0.2", source = { registry = "https://pypi-mirror.gitverse.ru/simple/" } },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4.tar.gz", hash = "sha256:2eb123979c87bcb329e8a2452269d60ff8f9f651e9bf25c67579e53c4ebbae3c" }
-wheels = [
-    { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4-cp310-cp310-macosx_10_10_x86_64.whl", hash = "sha256:ac29d594f5ed512d1c70b2bed799dd9158f904aa6a92365e48b561c1cbd7b009" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:bc96d4fb43d2e049f65831e1ab703eb617d26c9c112fdd6acd59ed1823a69870" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4-cp310-cp310-win32.whl", hash = "sha256:2d020c0b0db1869d58ee646afd9cc1276520a77a9d800d407927bfee35678970" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4-cp310-cp310-win_amd64.whl", hash = "sha256:95d390e0bf4bd8c4c1d77e2205887a5bc84e950e4f44719d66f8d14f59c777eb" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4-cp311-cp311-macosx_10_10_x86_64.whl", hash = "sha256:99478006f60ecf622ba55f8cda9177d3f2933f513589404a1e1c87eb8b0924b6" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:ec7d264dbb2301fdb6ee7bbe722652b06ab1aa4b6e25a76cba99d8a38aea8855" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4-cp311-cp311-win32.whl", hash = "sha256:b86b0258074f4ec16b234274fa0c32c42e039124c9f6f36529091c9a00ebff4d" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4-cp311-cp311-win_amd64.whl", hash = "sha256:f48fe7b9f22c7733a06b5901559b5b7e4835fa852cbef0f620ffd0a0030aaf73" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4-cp311-cp311-win_arm64.whl", hash = "sha256:fe83813241dfb94780f18dff1678d1ffd097116a8b8fea0272a332c387f69ef8" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4-cp39-cp39-macosx_10_10_x86_64.whl", hash = "sha256:a2ec6de12ad17ecc54ffd19d8158c6b3970fd817aca1f3231f57e9418c964df8" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:48a3efea46fe52891035c042c8481ed0a1a3b613f4eff38781f3a2e1951002a8" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4-cp39-cp39-win32.whl", hash = "sha256:e31e645ed4f0b048954f230f9a3d8dce84054fe9161f2f3ceeb2bbf176126424" },
-    { url = "https://pypi-mirror.gitverse.ru/packages/wxpython/4.2.4/wxpython-4.2.4-cp39-cp39-win_amd64.whl", hash = "sha256:1771079f39cfe1fd52a2302bf7d59fad716b71cb5369c9423480b1a518a72afd" },
-]
-
-[[package]]
-name = "wxpython"
 version = "4.2.5"
 source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version == '3.10.*'",
-]
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.3", source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }, marker = "python_full_version >= '3.11'" },
@@ -472,21 +350,10 @@ name = "wxwidgets"
 version = "1.0.5"
 source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }
 dependencies = [
-    { name = "webcolors", version = "24.11.1", source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }, marker = "python_full_version < '3.10'" },
-    { name = "webcolors", version = "25.10.0", source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }, marker = "python_full_version >= '3.10'" },
-    { name = "wxpython", version = "4.2.4", source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }, marker = "python_full_version < '3.10'" },
-    { name = "wxpython", version = "4.2.5", source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }, marker = "python_full_version >= '3.10'" },
+    { name = "webcolors" },
+    { name = "wxpython" },
 ]
 sdist = { url = "https://pypi-mirror.gitverse.ru/packages/wxwidgets/1.0.5/wxwidgets-1.0.5.tar.gz", hash = "sha256:4d4272921b944c03c2e1e583c851bd59ce08d58c926fd4d46b6ed3459ab0d192" }
 wheels = [
     { url = "https://pypi-mirror.gitverse.ru/packages/wxwidgets/1.0.5/wxwidgets-1.0.5-py3-none-any.whl", hash = "sha256:8a4c935cc7be113bc295ab4db938062f8d3337b27780fad84fec87e76c90b016" },
-]
-
-[[package]]
-name = "zipp"
-version = "3.23.0"
-source = { registry = "https://pypi-mirror.gitverse.ru/simple/" }
-sdist = { url = "https://pypi-mirror.gitverse.ru/packages/zipp/3.23.0/zipp-3.23.0.tar.gz", hash = "sha256:a07157588a12518c9d4034df3fbbee09c814741a33ff63c05fa29d26a2404166" }
-wheels = [
-    { url = "https://pypi-mirror.gitverse.ru/packages/zipp/3.23.0/zipp-3.23.0-py3-none-any.whl", hash = "sha256:071652d6115ed432f5ce1d34c336c0adfd6a884660d1e9712a256d3d3bd4b14e" },
 ]

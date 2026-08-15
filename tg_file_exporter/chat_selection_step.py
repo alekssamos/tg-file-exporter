@@ -2,7 +2,7 @@ import asyncio
 
 import wx  # type:ignore
 from loguru import logger
-from pyrogram.errors import RPCError
+from pyrogram.errors import FloodWait, RPCError
 from pyrogram.types import Message
 from wxasync import AsyncBind, StartCoroutine  # type:ignore
 
@@ -82,6 +82,8 @@ class ChatSelectionStep(WizardStep):
                     self.chat_list.Append,
                     chatline,
                 )
+        except FloodWait as fe:
+            await asyncio.sleep(fe.value)
         except (RPCError, AttributeError) as e:
             logger.exception("error in update dialogs")
             wx.CallAfter(

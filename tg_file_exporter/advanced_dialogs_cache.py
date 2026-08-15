@@ -125,6 +125,7 @@ class AdvancedDialogsCache:
 
             # Rate limit: ensure minimum 2s gap between get_dialogs calls
             async with self._dialogs_lock:
+                await asyncio.sleep(2)
                 elapsed = time.time() - self._last_api_call
                 if elapsed < 2.0:
                     logger.debug(f"rate limiting: waiting {2.0 - elapsed:.1f}s")
@@ -264,12 +265,14 @@ class AdvancedDialogsCache:
     async def _background_sync(self):
         """Full resync with Telegram — rate-limited for safety."""
         async with self._dialogs_lock:
+            await asyncio.sleep(2)
             elapsed = time.time() - self._last_api_call
             if elapsed < 3.0:
                 logger.debug(f"background sync: waiting {3.0 - elapsed:.1f}s")
                 await asyncio.sleep(3.0 - elapsed)
 
         logger.debug("background sync: loading dialogs from Telegram")
+        await asyncio.sleep(2)
         async with self._write_lock:
             rows = []
             pinned_index = 0
